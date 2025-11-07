@@ -1,11 +1,12 @@
 import { Suspense, useEffect, useState } from "react";
 import {
   BACKEND_API_URL,
+  Blockchain,
   EXTENSION_HEIGHT,
   EXTENSION_WIDTH,
   getLogger,
 } from "@coral-xyz/common";
-import { useBackgroundClient } from "@coral-xyz/recoil";
+import { useActiveWallet, useBackgroundClient } from "@coral-xyz/recoil";
 import {
   AlertTriangleIcon,
   StyledText,
@@ -13,6 +14,8 @@ import {
   useTheme,
   XStack,
 } from "@coral-xyz/tamagui";
+import { useRecoilValue } from "recoil";
+import { blockchainConnectionUrl } from "@coral-xyz/recoil/src/atoms/preferences";
 
 import { Unlocked } from "../components/Unlocked";
 import { refreshFeatureGates } from "../gates/FEATURES";
@@ -23,11 +26,53 @@ const logger = getLogger("router");
 
 export default function Router() {
   const classes = useStyles();
+
   return (
     <div className={classes.appContainer}>
       <PopupRouter />
       <OfflineBanner />
+      <TestnetBanner />
     </div>
+  );
+}
+
+function TestnetBanner() {
+  const { blockchain } = useActiveWallet();
+  const connectionUrl = useRecoilValue(blockchainConnectionUrl(blockchain));
+
+  // Only show banner for X1 Testnet
+  const isX1Testnet =
+    blockchain === Blockchain.X1 &&
+    connectionUrl === "https://rpc.testnet.x1.xyz";
+
+  // Log network status for debugging
+  console.log(
+    `[X1 Network ext:0.10.59] Blockchain: ${blockchain}, URL: ${connectionUrl}, IsTestnet: ${isX1Testnet}`
+  );
+
+  if (!isX1Testnet) {
+    return null;
+  }
+
+  return (
+    <XStack
+      position="absolute"
+      width="100%"
+      top="0px"
+      backgroundColor="rgba(255, 152, 0, 0.15)"
+      gap="4px"
+      paddingVertical="2px"
+      paddingHorizontal="$2"
+      justifyContent="center"
+      alignItems="center"
+      zIndex={100}
+      height="16px"
+    >
+      <AlertTriangleIcon color="rgb(255, 152, 0)" size={12} />
+      <StyledText fontSize="10px" fontWeight="600" color="rgb(255, 152, 0)">
+        X1 TESTNET
+      </StyledText>
+    </XStack>
   );
 }
 
