@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { gql, useApolloClient, useFragment } from "@apollo/client";
-import { UNKNOWN_ICON_SRC, wait } from "@coral-xyz/common";
+import { Blockchain, UNKNOWN_ICON_SRC, wait } from "@coral-xyz/common";
 import {
   GET_TOKEN_BALANCES_QUERY,
   type ProviderId,
@@ -65,6 +65,7 @@ function Container({ navigation, route }: SendConfirmationScreenProps) {
     try {
       await client.confirmTransaction(signature);
       await wait(2);
+
       await apollo.query({
         query: GET_TOKEN_BALANCES_QUERY,
         fetchPolicy: "network-only",
@@ -73,6 +74,7 @@ function Container({ navigation, route }: SendConfirmationScreenProps) {
           providerId: blockchain.toUpperCase() as ProviderId,
         },
       });
+
       setIsConfirmed(true);
     } catch (e) {
       const error = e as Error;

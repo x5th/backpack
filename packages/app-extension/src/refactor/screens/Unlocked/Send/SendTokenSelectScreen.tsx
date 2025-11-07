@@ -35,8 +35,9 @@ export function SendTokenSelectScreen(props: SendTokenSelectScreenProps) {
 function Container({ navigation }: SendTokenSelectScreenProps) {
   const { blockchain, publicKey } = useActiveWallet();
   const { t } = useTranslation();
-  const { data, error } = useQuery(GET_TOKEN_BALANCES_QUERY, {
-    fetchPolicy: "cache-only",
+
+  const { data, error, loading } = useQuery(GET_TOKEN_BALANCES_QUERY, {
+    fetchPolicy: "cache-and-network",
     variables: {
       address: publicKey,
       providerId: blockchain.toUpperCase() as ProviderId,
@@ -44,9 +45,14 @@ function Container({ navigation }: SendTokenSelectScreenProps) {
   });
 
   const tokens = useMemo(
-    () => data?.wallet?.balances?.tokens.edges.map((e) => e.node) ?? [],
+    // @ts-ignore - Mock GraphQL data
+    () => data?.wallet?.balances?.tokens.edges.map((e: any) => e.node) ?? [],
     [data]
   );
+
+  if (loading && !data) {
+    return <Loading />;
+  }
 
   if (error) {
     return (

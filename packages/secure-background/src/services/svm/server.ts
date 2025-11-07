@@ -1,6 +1,9 @@
 import type { WalletDescriptor } from "@coral-xyz/common";
 import { Blockchain } from "@coral-xyz/common";
-import { createSignInMessage, createSignInMessageText } from "@solana/wallet-standard-util";
+import {
+  createSignInMessage,
+  createSignInMessageText,
+} from "@solana/wallet-standard-util";
 import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import bs58, { decode, encode } from "bs58";
 
@@ -137,73 +140,78 @@ export class SVMService {
     });
   };
 
-  private handleSignIn: TransportHandler<"SECURE_SVM_SIGN_IN"> =
-    async ({
-      event,
-      request,
-      error,
-      respond
-    }) => {
+  private handleSignIn: TransportHandler<"SECURE_SVM_SIGN_IN"> = async ({
+    event,
+    request,
+    error,
+    respond,
+  }) => {
+    const user = await safeClientResponse(this.userClient.getUser());
+    if (user.keyringStoreState === KeyringStoreState.NeedsOnboarding) {
+      return error(new Error("No active user"));
+    }
+    let publicKey =
+      user.publicKeys?.platforms[request.blockchain]?.activePublicKey;
 
-      const user = await safeClientResponse(
-        this.userClient.getUser()
-      );
-      if (user.keyringStoreState === KeyringStoreState.NeedsOnboarding) {
-        return error(new Error("No active user"));
+    if (!publicKey) {
+      return error(new Error("No account for blockchain"));
+    }
+
+    if (request.input?.address) {
+      publicKey = request.input.address;
+      const publicKeyInfo =
+        user.publicKeys?.platforms[request.blockchain]?.publicKeys[
+          request.input.address
+        ];
+      if (!publicKeyInfo) {
+        return error(new Error("Requested public key not found."));
       }
-      let publicKey =
-        user.publicKeys?.platforms[request.blockchain]?.activePublicKey;
+    }
 
-      if (!publicKey) {
-        return error(new Error("No account for blockchain"));
-      }
+    const message = createSignInMessage({
+      domain: event.origin.address,
+      address: publicKey,
+      ...(request.input ?? {}),
+    });
 
-      if(request.input?.address) {
-        publicKey = request.input.address;
-        const publicKeyInfo = user.publicKeys?.platforms[request.blockchain]?.publicKeys[request.input.address];
-        if(!publicKeyInfo) {
-          return error(new Error("Requested public key not found."));
-        }
-      }
+    const encodedMessage = encode(message);
 
-      const message = createSignInMessage({
-        domain: event.origin.address,
-        address: publicKey,
-        ...request.input ?? {}
-      });
-
-      const encodedMessage = encode(message);
-
-      await safeClientResponse(this.secureUIClient.confirm(event, {
+    await safeClientResponse(
+      this.secureUIClient.confirm(event, {
         message: encode(message),
-        publicKey
-      }));
-
-      const { signature } = await this.getMessageSignature(
-        user,
         publicKey,
-        encodedMessage,
-        event.origin
-      )
-
-      const connectionUrl = user.preferences.blockchains.solana.connectionUrl;
-
-      return respond({
-        signedMessage: encodedMessage,
-        signature,
-        publicKey,
-        connectionUrl
       })
-    };
+    );
+
+    const { signature } = await this.getMessageSignature(
+      user,
+      publicKey,
+      encodedMessage,
+      event.origin
+    );
+
+    const connectionUrl = user.preferences.blockchains.solana.connectionUrl;
+
+    return respond({
+      signedMessage: encodedMessage,
+      signature,
+      publicKey,
+      connectionUrl,
+    });
+  };
 
   private handleSignMessage: TransportHandler<"SECURE_SVM_SIGN_MESSAGE"> =
     async (event) => {
       let publicKey = event.request.publicKey;
       if (["xnft", "browser"].includes(event.event.origin.context)) {
+        console.log(
+          "[SECURE_SVM_SIGN_MESSAGE] blockchain:",
+          event.request.blockchain ?? Blockchain.SOLANA
+        );
         const response = await safeClientResponse(
           this.userClient.approveOrigin({
             origin: event.event.origin,
-            blockchain: Blockchain.SOLANA,
+            blockchain: event.request.blockchain ?? Blockchain.SOLANA,
           })
         );
         publicKey = response.publicKey;
@@ -223,7 +231,7 @@ export class SVMService {
         publicKey,
         event.request.message,
         event.event.origin
-      )
+      );
 
       return event.respond({
         signedMessage: signature,
@@ -247,10 +255,14 @@ export class SVMService {
 
     let publicKey = event.request.publicKey;
     if (["xnft", "browser"].includes(event.event.origin.context)) {
+      console.log(
+        "[SECURE_SVM_SIGN_TX] blockchain:",
+        event.request.blockchain ?? Blockchain.SOLANA
+      );
       const response = await safeClientResponse(
         this.userClient.approveOrigin({
           origin: event.event.origin,
-          blockchain: Blockchain.SOLANA,
+          blockchain: event.request.blockchain ?? Blockchain.SOLANA,
         })
       );
       publicKey = publicKey ?? response.publicKey;
@@ -295,10 +307,14 @@ export class SVMService {
     }
     let publicKey = request.publicKey;
     if (["xnft", "browser"].includes(event.origin.context)) {
+      console.log(
+        "[SECURE_SVM_SIGN_ALL_TX] blockchain:",
+        request.blockchain ?? Blockchain.SOLANA
+      );
       const response = await safeClientResponse(
         this.userClient.approveOrigin({
           origin: event.origin,
-          blockchain: Blockchain.SOLANA,
+          blockchain: request.blockchain ?? Blockchain.SOLANA,
         })
       );
       publicKey = response.publicKey;
@@ -422,10 +438,7 @@ export class SVMService {
       );
       return { signature: ledgerResponse.signature };
     } else {
-      const signature = await blockchainKeyring.signMessage(
-        message,
-        publicKey
-      );
+      const signature = await blockchainKeyring.signMessage(message, publicKey);
       return { signature };
     }
   }

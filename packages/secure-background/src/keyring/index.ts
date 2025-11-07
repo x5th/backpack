@@ -19,6 +19,7 @@ export function hdFactoryForBlockchain(blockchain: Blockchain) {
   return {
     [Blockchain.SOLANA]: new SolanaHdKeyringFactory(),
     [Blockchain.ECLIPSE]: new SolanaHdKeyringFactory(),
+    [Blockchain.X1]: new SolanaHdKeyringFactory(),
     [Blockchain.ETHEREUM]: new EthereumHdKeyringFactory(),
   }[blockchain];
 }
@@ -37,6 +38,13 @@ export function keyringForBlockchain(
     ),
     [Blockchain.ECLIPSE]: new BlockchainKeyring(
       Blockchain.ECLIPSE,
+      store,
+      new SolanaHdKeyringFactory(),
+      new SolanaKeyringFactory(),
+      new SolanaLedgerKeyringFactory()
+    ),
+    [Blockchain.X1]: new BlockchainKeyring(
+      Blockchain.X1,
       store,
       new SolanaHdKeyringFactory(),
       new SolanaKeyringFactory(),

@@ -1,5 +1,6 @@
 {
   "manifest_version": 3,
+  "version": "0.10.37",
   "action": {
     "default_popup": "popup.html"
   },

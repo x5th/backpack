@@ -65,6 +65,9 @@ export class SolanaClient extends BlockchainClientBase<Blockchain.SOLANA> {
   public connection: BackpackSolanaConnection;
   public wallet: BackpackSolanaWallet;
   public Stake = new SolanaStakeClient(this.buildCtx.bind(this));
+  public blockchain: Blockchain;
+  // @ts-ignore - config can be SOLANA or X1
+  public config: BlockchainConfig;
 
   private recentBlockhash?: {
     blockhash: string;
@@ -74,18 +77,21 @@ export class SolanaClient extends BlockchainClientBase<Blockchain.SOLANA> {
   constructor(
     client: TransportSender,
     rpcUrl: string,
-    commitmentOrConfig?: Commitment | ConnectionConfig
+    commitmentOrConfig?: Commitment | ConnectionConfig,
+    blockchain: Blockchain = Blockchain.SOLANA
   ) {
     super();
+    this.blockchain = blockchain;
     this.secureSvmClient = new SVMClient(client);
     this.secureUserClient = new UserClient(client);
     this.connection = new BackpackSolanaConnection(rpcUrl, commitmentOrConfig);
     this.wallet = new BackpackSolanaWallet(
       this.secureSvmClient,
-      this.connection
+      this.connection,
+      blockchain
     );
     // Do NOT delete this.
-    this.config = getBlockchainConfig(Blockchain.SOLANA);
+    this.config = getBlockchainConfig(blockchain);
 
     const dummyWallet = Keypair.generate() as unknown as AnchorWallet;
 

@@ -14,9 +14,10 @@ import {
 import { RetryLink } from "@apollo/client/link/retry";
 import { LocalStorageWrapper, persistCacheSync } from "apollo3-cache-persist";
 
-import { BACKEND_API_URL } from "../constants";
+import { BACKEND_API_URL, X1_JSON_SERVER_URL } from "../constants";
 
 const cache = new InMemoryCache({
+  addTypename: true,
   typePolicies: {
     Wallet: {
       fields: {
@@ -141,6 +142,93 @@ export const cacheOnErrorApolloLinkHandler: RequestHandler = (
     };
   });
 };
+
+/**
+ * X1 Interceptor Link - Routes X1 queries to local JSON server
+ */
+export const x1InterceptorLink = new ApolloLink((operation, forward) => {
+  const { variables } = operation;
+
+  // Check if this is an X1 query by looking at the providerId variable
+  const isX1Query = variables?.providerId === "X1";
+
+  if (!isX1Query) {
+    // Not an X1 query, pass through to regular GraphQL endpoint
+    return forward(operation);
+  }
+
+  console.log("🔵 X1 Query Intercepted:", operation.operationName);
+
+  // Handle X1 queries by fetching from JSON server
+  return new Observable((observer) => {
+    const address = variables?.address;
+
+    if (!address) {
+      observer.error(new Error("X1 query missing address"));
+      return;
+    }
+
+    // Fetch balance from JSON server
+    fetch(`${X1_JSON_SERVER_URL}/wallet/${address}?providerId=X1`)
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("✅ X1 JSON Server Response:", data);
+
+        // Calculate lamports from balance
+        const lamports = Math.floor(data.balance * 1e9);
+
+        // Transform JSON server response to GraphQL format
+        const graphqlData = {
+          wallet: {
+            __typename: "Wallet",
+            id: address,
+            balances: {
+              __typename: "Balances",
+              tokens: {
+                __typename: "TokenBalanceConnection",
+                edges: data.tokens.map((token: any) => ({
+                  __typename: "TokenBalanceEdge",
+                  node: {
+                    __typename: "TokenBalance",
+                    id: "x1-native",
+                    address: token.mint,
+                    amount: lamports.toString(),
+                    decimals: token.decimals,
+                    displayAmount: token.balance.toFixed(4),
+                    token: token.mint,
+                    tokenListEntry: {
+                      __typename: "TokenListEntry",
+                      id: "xnt",
+                      address: token.mint,
+                      decimals: token.decimals,
+                      logo: token.logo,
+                      name: token.name,
+                      symbol: token.symbol,
+                    },
+                    marketData: {
+                      __typename: "TokenMarketData",
+                      id: "xnt-market",
+                      price: token.price,
+                      value: token.valueUSD,
+                      percentChange: 0,
+                      valueChange: 0,
+                    },
+                  },
+                })),
+              },
+            },
+          },
+        };
+
+        observer.next({ data: graphqlData });
+        observer.complete();
+      })
+      .catch((error) => {
+        console.error("❌ X1 JSON Server Error:", error);
+        observer.error(error);
+      });
+  });
+});
 /**
  * Synchronously persist any cache wrapper and return a configured Apollo client instance.
  * @export
@@ -155,14 +243,27 @@ export function createApolloClient(
   headers?: Record<string, string>
 ): ApolloClient<NormalizedCacheObject> {
   const httpLink = createHttpLink({
-    uri: `${BACKEND_API_URL}/v2/graphql`,
+    uri: `${BACKEND_API_URL}/`,
     headers,
   });
 
-  persistCacheSync({
-    cache,
-    storage: new LocalStorageWrapper(window.localStorage),
+  // Logging link to debug GraphQL queries
+  const loggingLink = new ApolloLink((operation, forward) => {
+    console.log("🚀 GraphQL Query:", operation.operationName);
+    console.log("📋 Query:", operation.query.loc?.source.body);
+    console.log("🔧 Variables:", JSON.stringify(operation.variables, null, 2));
+    console.log("🌐 URL:", BACKEND_API_URL);
+    return forward(operation).map((response) => {
+      console.log("✅ Response for", operation.operationName, ":", response);
+      return response;
+    });
   });
+
+  // Temporarily disable cache persistence for X1 development
+  // persistCacheSync({
+  //   cache,
+  //   storage: new LocalStorageWrapper(window.localStorage),
+  // });
 
   const version = SEMVER_RX.test(clientVersion)
     ? clientVersion.split("-")[0]
@@ -172,7 +273,17 @@ export function createApolloClient(
     name: clientName,
     version,
     cache,
+    defaultOptions: {
+      watchQuery: {
+        errorPolicy: "all",
+      },
+      query: {
+        errorPolicy: "all",
+      },
+    },
     link: from([
+      loggingLink,
+      x1InterceptorLink, // X1 interceptor MUST come before other links
       new ApolloLink(cacheOnErrorApolloLinkHandler),
       new RetryLink({
         delay: {

@@ -136,4 +136,30 @@ export const BLOCKCHAIN_COMPONENTS: Record<
       return BigNumber.from(0);
     },
   },
+  [Blockchain.X1]: {
+    LoadBalances: async (publicKeys: string[]) => {
+      const x1MainnetRpc =
+        process.env.DEFAULT_X1_CONNECTION_URL || "https://rpc.mainnet.x1.xyz";
+      const x1Connection = new SolanaConnection(x1MainnetRpc, "confirmed");
+      const accounts = (
+        await anchor.utils.rpc.getMultipleAccounts(
+          x1Connection,
+          publicKeys.map((p) => new PublicKey(p))
+        )
+      ).map((result, index) => {
+        return {
+          publicKey: publicKeys[index],
+          balance: result
+            ? BigNumber.from(result.account.lamports)
+            : BigNumber.from(0),
+          index,
+        };
+      });
+      return accounts;
+    },
+
+    MaxFeeOffset: (_token: { address: string; mint?: string }) => {
+      return BigNumber.from(0);
+    },
+  },
 };

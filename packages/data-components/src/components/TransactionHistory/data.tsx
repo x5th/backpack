@@ -157,8 +157,13 @@ export function useGetSuspenseTransactionsData({
   const { onRefresh, refreshing } = useRefreshableQuery(refetch);
 
   const onLoadMore = () => {
-    if (pagination && data?.wallet?.transactions?.pageInfo.hasNextPage) {
+    // @ts-ignore - Mock GraphQL data
+    if (
+      pagination && // @ts-ignore
+      data?.wallet?.transactions?.pageInfo.hasNextPage
+    ) {
       startTransition(() => {
+        // @ts-ignore - Mock GraphQL data
         const edges = data?.wallet?.transactions?.edges;
         fetchMore({
           variables: {

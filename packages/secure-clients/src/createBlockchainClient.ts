@@ -45,6 +45,20 @@ export function createBlockchainClient<B extends Blockchain>(
       return client as BlockchainClient<B>;
     }
 
+    case Blockchain.X1: {
+      // X1 is SVM-compatible, so we use SolanaClient with X1 RPC
+      const connectionUrl = "https://rpc.mainnet.x1.xyz";
+      const commitment = "confirmed";
+      const client: BlockchainClient<Blockchain.X1> = new SolanaClient(
+        transportSender,
+        connectionUrl,
+        commitment,
+        Blockchain.X1
+      );
+      // this cast is safe due to switch statement;
+      return client as BlockchainClient<B>;
+    }
+
     default: {
       throw new Error(
         `Failed to create BlockchainClient. Unknown blockchain: ${blockchain}`

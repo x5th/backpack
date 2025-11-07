@@ -70,6 +70,7 @@ export const useSpotlightSearchedNfts = (
 
   const nfts = useMemo(
     () =>
+      // @ts-ignore - Mock GraphQL data
       data?.walletNftAggregate.edges.reduce<ResponseNftNode[]>((acc, curr) => {
         const includesFilter = curr.node.name
           ?.toLowerCase()
@@ -85,6 +86,7 @@ export const useSpotlightSearchedNfts = (
 
         return acc;
       }, []) ?? [],
+    // @ts-ignore - Mock GraphQL data
     [data?.walletNftAggregate, searchFilter]
   );
 

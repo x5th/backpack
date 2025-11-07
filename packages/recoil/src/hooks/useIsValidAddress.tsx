@@ -74,15 +74,15 @@ export async function validateAddress(
     };
   }
 
-  if (blockchain === Blockchain.SOLANA) {
+  if (blockchain === Blockchain.SOLANA || blockchain === Blockchain.X1) {
     let pubkey;
 
     if (!solanaConnection) {
       throw new Error("Solana connection is required for address validation.");
     }
 
-    // SNS Domain
-    if (address.endsWith(".sol")) {
+    // SNS Domain (only for Solana, not X1)
+    if (blockchain === Blockchain.SOLANA && address.endsWith(".sol")) {
       try {
         pubkey = await resolve(solanaConnection, address);
       } catch (e) {
@@ -95,8 +95,9 @@ export async function validateAddress(
       }
     }
 
-    // If it's not .SOL throw an error
+    // If it's not .SOL throw an error (only for Solana)
     if (
+      blockchain === Blockchain.SOLANA &&
       !pubkey &&
       address.split(".").length === 2 &&
       !address.endsWith(".sol")
@@ -110,7 +111,7 @@ export async function validateAddress(
     }
 
     if (!pubkey) {
-      // Solana address validation
+      // Solana/X1 address validation
       try {
         pubkey = new PublicKey(address);
       } catch (err) {

@@ -1,4 +1,4 @@
-export { gql } from "./apollo/gql";
+export { gql } from "./apollo";
 export * from "./apollo/graphql";
 export * from "./components/Balances";
 export * from "./components/Collectibles";

@@ -46,6 +46,8 @@ export function useBlockchainActiveWallet(blockchain: Blockchain) {
       case Blockchain.ETHEREUM:
         return atoms.activeEthereumWallet!;
       case Blockchain.SOLANA:
+      case Blockchain.ECLIPSE:
+      case Blockchain.X1:
         return atoms.activeSolanaWallet!;
       default:
         throw new Error(`invalid blockchain ${blockchain}`);

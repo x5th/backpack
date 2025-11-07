@@ -448,7 +448,8 @@ export const EXCHANGE_SUMSUB_DOCS_URL =
   "https://sumsub.com/supported-documents";
 
 export const AVATAR_BASE_URL = "https://swr.xnftdata.com/avatars";
-export const BACKEND_API_URL = "https://backpack-api.xnfts.dev";
+export const BACKEND_API_URL = "http://localhost:4000";
+export const X1_JSON_SERVER_URL = "http://localhost:4000";
 export const MESSAGING_COMMUNICATION_PUSH = "MESSAGING_COMMUNICATION_PUSH";
 export const MESSAGING_COMMUNICATION_FETCH = "MESSAGINyarG_COMMUNICATION_FETCH";
 export const MESSAGING_COMMUNICATION_FETCH_RESPONSE =

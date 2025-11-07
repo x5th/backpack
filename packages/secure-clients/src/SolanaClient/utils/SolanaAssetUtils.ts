@@ -65,6 +65,16 @@ export type SolanaAsset =
 export async function getSolanaAssetById(
   assetId: string
 ): Promise<SolanaAsset> {
+  // Handle X1 native token - bypass GraphQL
+  if (assetId === "x1-native" || assetId.startsWith("TokenBalance:x1-native")) {
+    return {
+      __typename: "TokenBalance",
+      mint: "11111111111111111111111111111111",
+      fungibleAta: "11111111111111111111111111111111",
+      decimals: 9,
+    };
+  }
+
   const resp = await fetch(`${BACKEND_API_URL}/v2/graphql`, {
     method: "POST",
     headers: {

@@ -96,11 +96,27 @@ export const AddressSelector = ({
   const { provider: solanaProvider } = useAnchorContext();
   const ethereumCtx = useEthereumCtx();
   const [searchResults, setSearchResults] = useState<any[]>([]);
+
+  // For X1, create a connection to X1 RPC instead of Solana
+  const [x1Connection, setX1Connection] = useState<any>(null);
+  useEffect(() => {
+    if (blockchain === Blockchain.X1) {
+      import("@solana/web3.js").then(({ Connection }) => {
+        setX1Connection(
+          new Connection("https://rpc.mainnet.x1.xyz", "confirmed")
+        );
+      });
+    }
+  }, [blockchain]);
+
+  const connection =
+    blockchain === Blockchain.X1 ? x1Connection : solanaProvider.connection;
+
   const { isValidAddress, isErrorAddress, normalizedAddress } =
     useIsValidAddress(
       blockchain,
       inputContent,
-      solanaProvider.connection,
+      connection,
       ethereumCtx.provider
     );
 
@@ -167,13 +183,20 @@ const YourAddresses = ({
   const activeSolWallet = useActiveSolanaWallet();
   const activeEthWallet = useActiveEthereumWallet();
   const { t } = useTranslation();
+
+  // Get current active public key based on blockchain
+  const currentActivePublicKey =
+    blockchain === Blockchain.SOLANA
+      ? activeSolWallet?.publicKey
+      : blockchain === Blockchain.ETHEREUM
+        ? activeEthWallet?.publicKey
+        : wallets.find((w) => w.publicKey)?.publicKey; // For X1 and others, use first wallet
+
   const renderWallets = wallets
     .filter(
       (x) =>
-        x.publicKey !==
-          (blockchain === Blockchain.SOLANA
-            ? activeSolWallet.publicKey
-            : activeEthWallet.publicKey) && x.publicKey.includes(searchFilter)
+        x.publicKey !== currentActivePublicKey &&
+        x.publicKey.includes(searchFilter)
     )
     .map((wallet) => ({
       username,

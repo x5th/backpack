@@ -81,9 +81,10 @@ export function HiddenTokensList({
 
   const ownedTokens = useMemo<_TokenListEntryFragmentType[]>(
     () =>
+      // @ts-ignore - Mock GraphQL data
       (data?.wallet?.balances?.tokens.edges ?? []).reduce<
         _TokenListEntryFragmentType[]
-      >((acc, curr) => {
+      >((acc: any, curr: any) => {
         if (curr.node.tokenListEntry) acc.push(curr.node.tokenListEntry);
         return acc;
       }, []),

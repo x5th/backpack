@@ -5,6 +5,7 @@ import type { BlockchainConfig } from "../types/blockchain";
 import { eclipseBlockchainConfig } from "./eclipse/config";
 import { ethereumBlockchainConfig } from "./ethereum/config";
 import { solanaBlockchainConfig } from "./solana/config";
+import { x1BlockchainConfig } from "./x1/config";
 
 type BlockchainConfigMap<B extends Blockchain = Blockchain> = Record<
   B,
@@ -15,6 +16,7 @@ const blockchainConfigs: BlockchainConfigMap = {
   [Blockchain.ETHEREUM]: ethereumBlockchainConfig,
   [Blockchain.SOLANA]: solanaBlockchainConfig,
   [Blockchain.ECLIPSE]: eclipseBlockchainConfig,
+  [Blockchain.X1]: x1BlockchainConfig,
 };
 
 export function getAllBlockchainConfigs(): Record<

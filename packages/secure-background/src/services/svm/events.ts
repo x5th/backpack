@@ -19,6 +19,7 @@ export interface SECURE_SVM_SIGN_MESSAGE
     message: string;
     publicKey: string;
     uuid?: string;
+    blockchain?: Blockchain;
   };
   response: {
     signedMessage: string;
@@ -75,6 +76,7 @@ export interface SECURE_SVM_SIGN_TX
     tx: string;
     uuid?: string;
     disableTxMutation?: boolean;
+    blockchain?: Blockchain;
   };
   uiResponse: {
     confirmed: true;
@@ -94,6 +96,7 @@ export interface SECURE_SVM_SIGN_ALL_TX
     txs: string[];
     uuid?: string;
     disableTxMutation?: boolean;
+    blockchain?: Blockchain;
   };
   uiResponse: {
     confirmed: true;

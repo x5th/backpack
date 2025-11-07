@@ -1,6 +1,8 @@
 import { EthereumExplorer } from "./ethereum/explorer";
 import { SolanaCluster } from "./solana/cluster";
 import { SolanaExplorer } from "./solana/explorer";
+import { X1Cluster } from "./x1/cluster";
+import { X1Explorer } from "./x1/explorer";
 
 export function explorerUrl(
   base: string,
@@ -35,6 +37,8 @@ export function explorerUrl(
         SolanaExplorer.XRAY,
         `tx/${tx}${clusterSuffix(base, connectionUrl)}`
       );
+    case X1Explorer.X1_EXPLORER:
+      return join(X1Explorer.X1_EXPLORER, `tx/${tx}`);
     default:
       throw new Error("unknown explorer base");
   }
@@ -73,6 +77,8 @@ export function explorerAddressUrl(
         SolanaExplorer.XRAY,
         `account/${address}${clusterSuffix(base, connectionUrl)}`
       );
+    case X1Explorer.X1_EXPLORER:
+      return join(X1Explorer.X1_EXPLORER, `address/${address}`);
     default:
       throw new Error("unknown explorer base");
   }
@@ -116,6 +122,8 @@ export function explorerNftUrl(
         SolanaExplorer.XRAY,
         `token/${nft}${clusterSuffix(base, connectionUrl)}`
       );
+    case X1Explorer.X1_EXPLORER:
+      return join(X1Explorer.X1_EXPLORER, `address/${nft}`);
     default:
       throw new Error("unknown explorer base");
   }
@@ -136,6 +144,15 @@ function clusterSuffix(base: string, connectionUrl: string): string {
           return "?cluster=mainnet";
         case SolanaCluster.DEVNET:
           return "?cluster=devnet";
+        default:
+          return `?cluster=custom&customUrl=${encodeURIComponent(
+            connectionUrl
+          )}`;
+      }
+    case X1Explorer.X1_EXPLORER:
+      switch (connectionUrl) {
+        case X1Cluster.MAINNET:
+          return "?cluster=mainnet";
         default:
           return `?cluster=custom&customUrl=${encodeURIComponent(
             connectionUrl

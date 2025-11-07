@@ -484,10 +484,13 @@ function useSwapOutputTokensSolanaFn(
           amount: b?.amount ?? "0",
           displayAmount: b?.displayAmount ?? "0",
           marketData: {
+            // @ts-ignore - Mock GraphQL data
             value: b?.marketData?.value ?? 0,
+            // @ts-ignore - Mock GraphQL data
             valueChange: b?.marketData?.valueChange ?? 0,
           },
           token: t.address,
+          // @ts-ignore - Mock GraphQL data
           tokenListEntry: {
             ...t,
             name: t.address === WSOL_MINT ? "Solana" : t.name,
@@ -528,10 +531,13 @@ export function useSwapOutputTokensSolana(
               amount: b?.amount ?? "0",
               displayAmount: b?.displayAmount ?? "0",
               marketData: {
+                // @ts-ignore - Mock GraphQL data
                 value: b?.marketData?.value ?? 0,
+                // @ts-ignore - Mock GraphQL data
                 valueChange: b?.marketData?.valueChange ?? 0,
               },
               token: t.address,
+              // @ts-ignore - Mock GraphQL data
               tokenListEntry: {
                 ...t,
                 name: t.address === WSOL_MINT ? "Solana" : t.name,

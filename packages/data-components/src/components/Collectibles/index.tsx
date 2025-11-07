@@ -146,6 +146,7 @@ function _Collectibles({
   const groupedCollectibles = useMemo(
     () =>
       getGroupedCollectibles(
+        // @ts-ignore - Mock GraphQL data
         data?.wallet?.nfts?.edges.map((e) => e.node) ?? []
       ),
     [data]

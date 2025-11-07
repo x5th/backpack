@@ -15,8 +15,7 @@ export const solanaBlockchainConfig: BlockchainConfig<Blockchain.SOLANA> = {
   caip2Reference: "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
 
   defaultRpcUrl: SolanaCluster.MAINNET,
-  blowfishUrl:
-    "https://blowfish.xnftdata.com/solana/v0/mainnet/scan/transactions",
+  blowfishUrl: "http://localhost:4000/solana/v0/mainnet/scan/transactions",
   isTestnet: false,
 
   Enabled: true,

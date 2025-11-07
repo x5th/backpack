@@ -8,28 +8,34 @@ export type BlockchainClient<B extends Blockchain = Blockchain> =
   B extends Blockchain.ETHEREUM
     ? EthereumClient
     : B extends Blockchain.SOLANA
-    ? SolanaClient
-    : B extends Blockchain.ECLIPSE
-    ? SolanaClient
-    : never;
+      ? SolanaClient
+      : B extends Blockchain.ECLIPSE
+        ? SolanaClient
+        : B extends Blockchain.X1
+          ? SolanaClient
+          : never;
 
 export type BlockchainReceipt<B extends Blockchain = Blockchain> =
   B extends Blockchain.ETHEREUM
     ? string
     : B extends Blockchain.SOLANA
-    ? string
-    : B extends Blockchain.ECLIPSE
-    ? string
-    : never;
+      ? string
+      : B extends Blockchain.ECLIPSE
+        ? string
+        : B extends Blockchain.X1
+          ? string
+          : never;
 
 export type BlockchainConfirmation<B extends Blockchain = Blockchain> =
   B extends Blockchain.ETHEREUM
     ? true
     : B extends Blockchain.SOLANA
-    ? true
-    : B extends Blockchain.ECLIPSE
-    ? true
-    : never;
+      ? true
+      : B extends Blockchain.ECLIPSE
+        ? true
+        : B extends Blockchain.X1
+          ? true
+          : never;
 
 export type BackpackAssetId = string;
 export type BackpackEntity = {

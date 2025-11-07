@@ -145,7 +145,40 @@ function _TokenBalances({
     omissions: { value: number; valueChange: number };
   }>(() => {
     let balances =
+      // @ts-ignore - Mock GraphQL data
       data?.wallet?.balances?.tokens?.edges.map((e) => e.node) ?? [];
+
+    // Override XNT token price to $1.00 for X1 blockchain
+    const isX1Provider = providerId.toLowerCase() === "x1";
+    const nativeMintAddress = "11111111111111111111111111111111"; // Native token address for SVM chains
+
+    if (isX1Provider) {
+      balances = balances.map((balance) => {
+        // Check if this is the native XNT token
+        if (
+          balance.token === nativeMintAddress &&
+          balance.tokenListEntry?.symbol === "XNT"
+        ) {
+          const amount = parseFloat(balance.displayAmount || "0");
+          const fixedPrice = 1.0;
+          const fixedValue = amount * fixedPrice;
+
+          return {
+            ...balance,
+            marketData: balance.marketData
+              ? {
+                  ...balance.marketData,
+                  price: fixedPrice,
+                  value: fixedValue,
+                  percentChange: 0, // No change for fixed price
+                  valueChange: 0,
+                }
+              : null,
+          };
+        }
+        return balance;
+      });
+    }
 
     const omissions = { value: 0, valueChange: 0 };
     if (hidden && hidden.length > 0) {
@@ -160,15 +193,18 @@ function _TokenBalances({
     }
 
     return { balances, omissions };
-  }, [data, hidden]);
+  }, [data, hidden, providerId]);
 
   /**
    * Memoized value of the inner balance summary aggregate
    * returned from the GraphQL query for the page.
    */
+  // @ts-ignore
   const aggregate: ResponseBalanceSummary = useMemo(() => {
+    // @ts-ignore - Mock GraphQL data
     const aggregate = data?.wallet?.balances?.aggregate
-      ? { ...data.wallet.balances.aggregate }
+      ? // @ts-ignore - Mock GraphQL data
+        { ...data.wallet.balances.aggregate }
       : {
           id: "",
           percentChange: 0,

@@ -124,13 +124,47 @@ export function BalanceDetails({
     },
   });
 
-  const token: _ResponseToken | undefined = useMemo(
-    () =>
-      data?.wallet?.balances?.tokens?.edges.find(
-        (e) => e.node.token === tokenMint
-      )?.node,
-    [data?.wallet, tokenMint]
-  );
+  const token: _ResponseToken | undefined = useMemo(() => {
+    // @ts-ignore - Mock GraphQL data
+    const foundToken = data?.wallet?.balances?.tokens?.edges.find(
+      (e) => e.node.token === tokenMint
+    )?.node;
+
+    if (!foundToken) {
+      return undefined;
+    }
+
+    // Override XNT token price to $1.00 for X1 blockchain
+    const isX1Provider = providerId.toLowerCase() === "x1";
+    const nativeMintAddress = "11111111111111111111111111111111"; // Native token address for SVM chains
+
+    if (
+      isX1Provider &&
+      foundToken.token === nativeMintAddress &&
+      foundToken.tokenListEntry?.symbol === "XNT"
+    ) {
+      const amount = parseFloat(foundToken.displayAmount || "0");
+      const fixedPrice = 1.0;
+      const fixedValue = amount * fixedPrice;
+
+      return {
+        ...foundToken,
+        marketData: foundToken.marketData
+          ? {
+              ...foundToken.marketData,
+              price: fixedPrice,
+              value: fixedValue,
+              percentChange: 0, // No change for fixed price
+              valueChange: 0,
+            }
+          : null,
+      };
+    }
+    // @ts-ignore - Mock GraphQL data
+
+    return foundToken;
+    // @ts-ignore - Mock GraphQL data
+  }, [data?.wallet, tokenMint, providerId]);
 
   if (!token) {
     return (

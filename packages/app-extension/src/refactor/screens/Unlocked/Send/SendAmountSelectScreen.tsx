@@ -61,8 +61,6 @@ function _Send({
     params: { assetId, to },
   },
 }: SendAmountSelectScreenProps) {
-  // publicKey should only be undefined if the user is in single-wallet mode
-  // (rather than aggregate mode).
   const apollo = useApolloClient();
   const data = apollo.readFragment<TokenTableBalance>({
     id: `TokenBalance:${assetId}`,

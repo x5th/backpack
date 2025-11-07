@@ -2,6 +2,11 @@ import { Blockchain } from "@coral-xyz/common";
 import type { SVMClient } from "@coral-xyz/secure-background/clients";
 import type { SecureEvent } from "@coral-xyz/secure-background/types";
 import type {
+  SolanaSignInInput} from "@solana/wallet-standard-features";
+import {
+  SolanaSignInOutput,
+} from "@solana/wallet-standard-features";
+import type {
   Commitment,
   ConfirmOptions,
   Connection,
@@ -26,15 +31,20 @@ import {
   deserializeTransaction,
   isVersionedTransaction,
 } from "./utils/transaction-helpers";
-import { SolanaSignInInput, SolanaSignInOutput } from "@solana/wallet-standard-features"
 
 export class BackpackSolanaWallet {
   private secureSvmClient: SVMClient;
   private connection: Connection;
+  private blockchain: Blockchain;
 
-  constructor(svmClient: SVMClient, connection: Connection) {
+  constructor(
+    svmClient: SVMClient,
+    connection: Connection,
+    blockchain: Blockchain = Blockchain.SOLANA
+  ) {
     this.secureSvmClient = svmClient;
     this.connection = connection;
+    this.blockchain = blockchain;
   }
 
   public async connect({
@@ -128,6 +138,7 @@ export class BackpackSolanaWallet {
       publicKey: request.publicKey.toBase58(),
       message: encode(request.message),
       uuid: request.uuid,
+      blockchain: this.blockchain,
     });
     if (!svmResponse.response) {
       throw svmResponse.error;
@@ -135,17 +146,15 @@ export class BackpackSolanaWallet {
     return decode(svmResponse.response.signedMessage);
   }
 
-  public async signIn(
-    input?: SolanaSignInInput
-  ): Promise<{
+  public async signIn(input?: SolanaSignInInput): Promise<{
     signedMessage: string;
     signature: string;
     publicKey: string;
     connectionUrl: string;
   }> {
     const svmResponse = await this.secureSvmClient.signIn({
-      blockchain: Blockchain.SOLANA,
-      input
+      blockchain: this.blockchain,
+      input,
     });
     if (!svmResponse.response) {
       throw svmResponse.error;
@@ -154,7 +163,7 @@ export class BackpackSolanaWallet {
   }
 
   private async prepareTransaction<
-    T extends Transaction | VersionedTransaction
+    T extends Transaction | VersionedTransaction,
   >(request: {
     publicKey: PublicKey;
     tx: T;
@@ -211,6 +220,7 @@ export class BackpackSolanaWallet {
         tx: txStr,
         uuid: request.uuid,
         disableTxMutation: request.disableTxMutation,
+        blockchain: this.blockchain,
       },
       { uiOptions }
     );
@@ -227,7 +237,7 @@ export class BackpackSolanaWallet {
   }
 
   public async signAllTransactions<
-    T extends Transaction | VersionedTransaction
+    T extends Transaction | VersionedTransaction,
   >(
     request: {
       publicKey: PublicKey;
@@ -260,6 +270,7 @@ export class BackpackSolanaWallet {
       txs: txStrs,
       uuid: request.uuid,
       disableTxMutation: request.disableTxMutation,
+      blockchain: this.blockchain,
     });
 
     if (!signatures.response?.signatures) {
@@ -366,22 +377,22 @@ export class BackpackSolanaWallet {
     const signersOrConf =
       "message" in tx
         ? ({
-          accounts: {
-            encoding: "base64",
-            addresses: [
-              ...(request.includedAccounts ?? []),
-              publicKey.toString(),
-            ],
-          },
-        } as SimulateTransactionConfig)
+            accounts: {
+              encoding: "base64",
+              addresses: [
+                ...(request.includedAccounts ?? []),
+                publicKey.toString(),
+              ],
+            },
+          } as SimulateTransactionConfig)
         : undefined;
 
     const response = await (isVersionedTransaction(preparedTx)
       ? connection.simulateTransaction(preparedTx, signersOrConf)
       : this.connection.simulateTransaction(preparedTx, undefined, [
-        ...(request.includedAccounts?.map((p) => new PublicKey(p)) ?? []),
-        publicKey,
-      ]));
+          ...(request.includedAccounts?.map((p) => new PublicKey(p)) ?? []),
+          publicKey,
+        ]));
 
     return response.value;
   }
