@@ -18,7 +18,7 @@ export const solanaBlockchainConfig: BlockchainConfig<Blockchain.SOLANA> = {
   blowfishUrl: "http://localhost:4000/solana/v0/mainnet/scan/transactions",
   isTestnet: false,
 
-  Enabled: true,
+  Enabled: false,
   Blockchain: Blockchain.SOLANA,
   Name: "Solana",
   GasTokenName: "SOL",
