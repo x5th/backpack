@@ -23,11 +23,7 @@ export const SolanaWallet: FC = (props) => {
 
   // You can also provide a custom RPC endpoint.
   const endpoint = useMemo(() => {
-    if (network === "mainnet-beta") {
-      return "https://swr.xnftdata.com/rpc-proxy/";
-    } else {
-      return clusterApiUrl(network);
-    }
+    return clusterApiUrl(network);
   }, [network]);
 
   // @solana/wallet-adapter-wallets includes all the adapters but supports tree shaking and lazy loading --
