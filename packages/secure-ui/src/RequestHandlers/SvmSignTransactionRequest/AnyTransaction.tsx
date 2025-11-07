@@ -115,7 +115,8 @@ export function AnyTransaction({
       kind: "error",
     });
   }
-  if (hasGas !== true) {
+  // Skip gas check for X1 - it checks SOL balance but X1 uses XNT
+  if (!isX1Transaction && hasGas !== true) {
     customWarnings.push({
       message:
         "Not enought SOL to pay for gas. Top up your wallet and try again.",
