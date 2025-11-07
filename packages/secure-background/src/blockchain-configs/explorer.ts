@@ -38,7 +38,11 @@ export function explorerUrl(
         `tx/${tx}${clusterSuffix(base, connectionUrl)}`
       );
     case X1Explorer.X1_EXPLORER:
-      return join(X1Explorer.X1_EXPLORER, `tx/${tx}`);
+      // Use testnet explorer if on testnet
+      const txExplorerBase = connectionUrl === X1Cluster.TESTNET
+        ? X1Explorer.X1_TESTNET_EXPLORER
+        : X1Explorer.X1_EXPLORER;
+      return join(txExplorerBase, `tx/${tx}`);
     default:
       throw new Error("unknown explorer base");
   }
@@ -78,7 +82,11 @@ export function explorerAddressUrl(
         `account/${address}${clusterSuffix(base, connectionUrl)}`
       );
     case X1Explorer.X1_EXPLORER:
-      return join(X1Explorer.X1_EXPLORER, `address/${address}`);
+      // Use testnet explorer if on testnet
+      const addressExplorerBase = connectionUrl === X1Cluster.TESTNET
+        ? X1Explorer.X1_TESTNET_EXPLORER
+        : X1Explorer.X1_EXPLORER;
+      return join(addressExplorerBase, `address/${address}`);
     default:
       throw new Error("unknown explorer base");
   }
@@ -123,7 +131,11 @@ export function explorerNftUrl(
         `token/${nft}${clusterSuffix(base, connectionUrl)}`
       );
     case X1Explorer.X1_EXPLORER:
-      return join(X1Explorer.X1_EXPLORER, `address/${nft}`);
+      // Use testnet explorer if on testnet
+      const nftExplorerBase = connectionUrl === X1Cluster.TESTNET
+        ? X1Explorer.X1_TESTNET_EXPLORER
+        : X1Explorer.X1_EXPLORER;
+      return join(nftExplorerBase, `address/${nft}`);
     default:
       throw new Error("unknown explorer base");
   }

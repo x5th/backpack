@@ -46,7 +46,7 @@ export const x1BlockchainConfig: BlockchainConfig<Blockchain.X1> = {
   PreferencesDefault: {
     explorer: X1Explorer.DEFAULT,
     connectionUrl: X1Cluster.DEFAULT,
-    commitment: "confirmed",
+    commitment: "processed",
   },
   validatePublicKey: (address: string) => {
     try {
@@ -66,6 +66,10 @@ export const x1BlockchainConfig: BlockchainConfig<Blockchain.X1> = {
       name: "Mainnet",
       url: X1Cluster.MAINNET,
     },
+    TESTNET: {
+      name: "Testnet",
+      url: X1Cluster.TESTNET,
+    },
   },
   ConfirmationCommitments: {
     Processed: {
@@ -79,8 +83,11 @@ export const x1BlockchainConfig: BlockchainConfig<Blockchain.X1> = {
     },
   },
   Explorers: {
-    "X1 Explorer": {
+    "X1 Mainnet": {
       url: X1Explorer.X1_EXPLORER,
+    },
+    "X1 Testnet": {
+      url: X1Explorer.X1_TESTNET_EXPLORER,
     },
   },
 };
