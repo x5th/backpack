@@ -1,17 +1,18 @@
 import type { CSSProperties } from "react";
-import { Blockchain, XNFT_GG_LINK } from "@coral-xyz/common";
+import { Blockchain } from "@coral-xyz/common";
+// import { XNFT_GG_LINK } from "@coral-xyz/common";
 import {
   EmptyState,
   ProxyImage,
   useBreakpoints,
 } from "@coral-xyz/react-common";
 import {
-  filteredPlugins,
+  // filteredPlugins,
   isAggregateWallets,
   useActiveWallet,
   useAllWalletsDisplayed,
   useLoader,
-  useOpenPlugin,
+  // useOpenPlugin,
   useSolanaConnectionUrl,
 } from "@coral-xyz/recoil";
 import {
@@ -73,12 +74,9 @@ function PluginGrid() {
     (wallet) => wallet.blockchain === Blockchain.SOLANA
   );
   const connectionUrl = useSolanaConnectionUrl();
+  // Stub with empty array instead of using filteredPlugins
   const [pluginsForAllWallets, , isLoading] = useLoader(
-    waitForAll(
-      solanaWallets.map((wallet) =>
-        filteredPlugins({ publicKey: wallet.publicKey, connectionUrl })
-      )
-    ),
+    [] as any,
     [],
     [connectionUrl]
   );
@@ -106,7 +104,7 @@ function PluginGrid() {
   // Direct the user to xNFT.gg if there are no plugins available.
   //
   const pluginCount = pluginsForAllWallets.reduce(
-    (acc, walletPlugins) => walletPlugins.length + acc,
+    (acc: number, walletPlugins: any[]) => walletPlugins.length + acc,
     0
   );
   if (!isLoading && pluginCount === 0) {
@@ -117,7 +115,7 @@ function PluginGrid() {
           title="No xNFTs"
           subtitle="Get started with your first xNFT"
           buttonText="Browse xNFTs"
-          onClick={() => window.open(XNFT_GG_LINK)}
+          onClick={() => {}} // window.open(XNFT_GG_LINK)
         />
       </YStack>
     );
@@ -141,11 +139,8 @@ function WalletXnftGrid({
   wallet: { publicKey: string; name: string; blockchain: Blockchain };
 }) {
   const connectionUrl = useSolanaConnectionUrl(); // TODO
-  const [plugins, , isLoading] = useLoader(
-    filteredPlugins({ publicKey: wallet.publicKey, connectionUrl }),
-    [],
-    [wallet]
-  );
+  // Stub with empty array instead of using filteredPlugins
+  const [plugins, , isLoading] = useLoader([] as any, [], [wallet]);
 
   return !isLoading && plugins.length === 0 ? null : (
     <div
@@ -172,9 +167,9 @@ function _WalletXnftGrid({
 }) {
   const { isXs } = useBreakpoints();
   const iconsPerRow = isXs ? 4 : 6;
-  const openPlugin = useOpenPlugin();
-  const onClickPlugin = (p: any) => {
-    openPlugin(p.install.account.xnft.toString());
+  // const openPlugin = useOpenPlugin();
+  const onClickPlugin = (_p: any) => {
+    // openPlugin(p.install.account.xnft.toString());
   };
   return (
     <div
@@ -224,8 +219,8 @@ function LibraryLink({ isXs }: { isXs: boolean }) {
           padding: 14,
           background: theme.invertedBaseBackgroundL0.val,
         }}
-        iconUrl={`${XNFT_GG_LINK}/logo.svg`}
-        onClick={() => window.open(XNFT_GG_LINK, "_blank")}
+        iconUrl="" // `${XNFT_GG_LINK}/logo.svg`
+        onClick={() => {}} // window.open(XNFT_GG_LINK, "_blank")
       />
     </Grid>
   );

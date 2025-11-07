@@ -26,7 +26,7 @@ export function XnftSettings() {
   // const { contents, state } = useRecoilValueLoadable(
   //   filteredPlugins({ publicKey, connectionUrl })
   // );
-  const contents = [];
+  const contents: any[] = [];
   const state = "hasValue";
   const { t } = useTranslation();
 

@@ -3,9 +3,11 @@ import {
   Blockchain,
   DEFAULT_PUBKEY_STR,
   getLogger,
-  UI_RPC_METHOD_SET_XNFT_PREFERENCES,
-  XNFT_GG_LINK,
+  // UI_RPC_METHOD_SET_XNFT_PREFERENCES,
+  // XNFT_GG_LINK,
 } from "@coral-xyz/common";
+
+const XNFT_GG_LINK = "https://xnft.gg"; // Stubbed
 import { useTranslation } from "@coral-xyz/i18n";
 import {
   CheckIcon,
@@ -25,13 +27,16 @@ import {
 } from "@coral-xyz/recoil";
 import { explorerUrl } from "@coral-xyz/secure-background/legacyCommon";
 import {
-  BAKED_IN_XNFTS,
+  // BAKED_IN_XNFTS,
   confirmTransaction,
   Solana,
 } from "@coral-xyz/secure-clients/legacyCommon";
 import { useTheme } from "@coral-xyz/tamagui";
 import { Button, Typography } from "@mui/material";
 import { useRecoilValue } from "recoil";
+
+// Stub BAKED_IN_XNFTS
+const BAKED_IN_XNFTS: any = {};
 
 import { ApproveTransactionDrawer } from "../../../common/ApproveTransactionDrawer";
 import { SettingsList } from "../../../common/Settings/List";
@@ -54,7 +59,7 @@ export const XnftDetail: React.FC<{ xnft: any }> = ({ xnft }) => {
     () =>
       xnft.title === "Simulator" ||
       Object.values(BAKED_IN_XNFTS).find(
-        (x) => x.publicKey === xnft.install.account.xnft.toBase58()
+        (x: any) => x.publicKey === xnft.install.account.xnft.toBase58()
       ) !== undefined,
     [xnft]
   );
@@ -85,16 +90,16 @@ export const XnftDetail: React.FC<{ xnft: any }> = ({ xnft }) => {
           onChange={async () => {
             // const updatedMediaPermissions = !xnftPreference?.mediaPermissions;
             const updatedMediaPermissions = false;
-            await background.request({
-              method: UI_RPC_METHOD_SET_XNFT_PREFERENCES,
-              params: [
-                uuid,
-                xnft.install.account.xnft.toString(),
-                {
-                  mediaPermissions: updatedMediaPermissions,
-                },
-              ],
-            });
+            // await background.request({
+            //   method: UI_RPC_METHOD_SET_XNFT_PREFERENCES,
+            //   params: [
+            //     uuid,
+            //     xnft.install.account.xnft.toString(),
+            //     {
+            //       mediaPermissions: updatedMediaPermissions,
+            //     },
+            //   ],
+            // });
             if (updatedMediaPermissions) {
               const result = await window.navigator.permissions.query({
                 //@ts-ignore: camera not part of the typedoc yet

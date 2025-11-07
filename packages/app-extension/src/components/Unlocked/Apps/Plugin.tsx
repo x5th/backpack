@@ -5,10 +5,10 @@ import { Loading, PowerIcon } from "@coral-xyz/react-common";
 import {
   transactionRequest,
   useActiveSolanaWallet,
-  useClosePlugin,
-  useFreshPlugin,
-  useOpenPlugin,
-  usePlugins,
+  // useClosePlugin,
+  // useFreshPlugin,
+  // useOpenPlugin,
+  // usePlugins,
 } from "@coral-xyz/recoil";
 import { useTheme } from "@coral-xyz/tamagui";
 import { Button } from "@mui/material";
@@ -44,16 +44,19 @@ function LoadPlugin({
   xnftAddress: string | undefined;
   deepXnftPath: string;
 }) {
-  const { publicKey } = useActiveSolanaWallet(); // TODO: aggregate wallet considerations.
-  const plugins = usePlugins(publicKey);
+  // const { publicKey } = useActiveSolanaWallet(); // TODO: aggregate wallet considerations.
+  // const plugins = usePlugins(publicKey);
+  const plugins: any[] = []; // Stubbed
   const setTransactionRequest = useSetRecoilState(transactionRequest);
-  const openPlugin = useOpenPlugin();
+  // const openPlugin = useOpenPlugin();
 
   if (!xnftAddress) {
     return <Loading />;
   }
 
-  const plugin = plugins?.find((p) => p.xnftAddress.toString() === xnftAddress);
+  const plugin = plugins?.find(
+    (p: any) => p.xnftAddress.toString() === xnftAddress
+  );
 
   if (!plugin) {
     return (
@@ -65,7 +68,7 @@ function LoadPlugin({
   }
   plugin.setHostApi({
     request: setTransactionRequest,
-    openPlugin,
+    // openPlugin,
   });
 
   if (xnftAddress === DEFAULT_PUBKEY_STR) {
@@ -75,17 +78,18 @@ function LoadPlugin({
 }
 
 function DisplayFreshPlugin({
-  xnftAddress,
-  deepXnftPath,
+  xnftAddress: _xnftAddress,
+  deepXnftPath: _deepXnftPath,
 }: {
   xnftAddress: string;
   deepXnftPath: string;
 }) {
-  const p = useFreshPlugin(xnftAddress);
-  if (!p.result) {
-    return null;
-  }
-  return <PluginDisplay plugin={p.result} deepXnftPath={deepXnftPath} />;
+  // const p = useFreshPlugin(xnftAddress);
+  // if (!p.result) {
+  //   return null;
+  // }
+  // return <PluginDisplay plugin={p.result} deepXnftPath={deepXnftPath} />;
+  return null; // Stubbed
 }
 
 export function PluginDisplay({
@@ -112,7 +116,7 @@ export function PluginDisplay({
 }
 
 function PluginControl({ plugin }: { plugin: any | null }) {
-  const closePlugin = useClosePlugin();
+  // const closePlugin = useClosePlugin();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -181,7 +185,7 @@ function PluginControl({ plugin }: { plugin: any | null }) {
 				*/}
         <Button
           disableRipple
-          onClick={() => closePlugin()}
+          onClick={() => {} /* closePlugin() */}
           sx={{
             position: "relative",
             borderRadius: "18.5px",

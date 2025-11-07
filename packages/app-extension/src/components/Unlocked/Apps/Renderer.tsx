@@ -8,7 +8,7 @@ import {
   useAvatarUrl,
   useDarkMode,
   useUser,
-  xnftPreference as xnftPreferenceAtom,
+  // xnftPreference as xnftPreferenceAtom,
 } from "@coral-xyz/recoil";
 import { useRecoilValue } from "recoil";
 
@@ -28,9 +28,10 @@ export function PluginRenderer({
   const [splash, setSplash] = useState<string | null>(null);
   const isDarkMode = useDarkMode();
   const avatarUrl = useAvatarUrl(100);
-  const xnftPreference = useRecoilValue(
-    xnftPreferenceAtom(plugin?.xnftInstallAddress?.toString())
-  );
+  // const xnftPreference = useRecoilValue(
+  //   xnftPreferenceAtom(plugin?.pluginInstallAddress?.toString())
+  // );
+  const xnftPreference: any = null; // Stubbed
   useEffect(() => {
     if (plugin && ref && ref.current) {
       plugin.mount(xnftPreference, deepXnftPath);

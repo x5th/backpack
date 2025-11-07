@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import type { Plugin } from "@coral-xyz/common";
-import { SIMULATOR_URL } from "@coral-xyz/recoil";
 
+// import { SIMULATOR_URL } from "@coral-xyz/recoil";
 import { PluginDisplay } from "./Plugin";
 
 const removeTimestamps = /[0-9]{13}/g;
+const SIMULATOR_URL = "http://localhost:9933"; // Stubbed
 
 // The refresh code is a big hack. :)
 export function Simulator({
