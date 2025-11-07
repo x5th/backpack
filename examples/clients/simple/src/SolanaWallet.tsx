@@ -22,13 +22,7 @@ export const SolanaWallet: FC = (props) => {
   const network = WalletAdapterNetwork.Mainnet;
 
   // You can also provide a custom RPC endpoint.
-  const endpoint = useMemo(() => {
-    if (network === "mainnet-beta") {
-      return "http://localhost:4000/rpc-proxy/";
-    } else {
-      return clusterApiUrl(network);
-    }
-  }, [network]);
+  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
 
   // @solana/wallet-adapter-wallets includes all the adapters but supports tree shaking and lazy loading --
   // Only the wallets you configure here will be compiled into your application, and only the dependencies
