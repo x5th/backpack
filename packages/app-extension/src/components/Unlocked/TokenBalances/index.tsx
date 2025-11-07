@@ -43,21 +43,6 @@ export function TokenBalances() {
       address={publicKey}
       providerId={blockchain.toUpperCase() as ProviderId}
       fetchPolicy="cache-and-network"
-      onItemClick={async ({
-        id,
-        displayAmount,
-        symbol,
-        token,
-        tokenAccount,
-      }) => {
-        navigation.push(Routes.TokensDetailScreen, {
-          id,
-          displayAmount,
-          symbol,
-          token,
-          tokenAddress: tokenAccount,
-        });
-      }}
       tableFooterComponent={
         <XStack
           className={classes.settings}
