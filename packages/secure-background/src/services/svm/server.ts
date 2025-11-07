@@ -187,7 +187,8 @@ export class SVMService {
       user,
       publicKey,
       encodedMessage,
-      event.origin
+      event.origin,
+      request.blockchain ?? Blockchain.SOLANA
     );
 
     const connectionUrl = user.preferences.blockchains.solana.connectionUrl;
@@ -230,7 +231,8 @@ export class SVMService {
         user,
         publicKey,
         event.request.message,
-        event.event.origin
+        event.event.origin,
+        event.request.blockchain ?? Blockchain.SOLANA
       );
 
       return event.respond({
@@ -284,7 +286,8 @@ export class SVMService {
       activeUser,
       publicKey,
       confirmation.tx,
-      event.event.origin
+      event.event.origin,
+      event.request.blockchain ?? Blockchain.SOLANA
     );
 
     const signedTx = VersionedTransaction.deserialize(decode(confirmation.tx));
@@ -331,7 +334,8 @@ export class SVMService {
           activeUser,
           publicKey,
           tx,
-          event.origin
+          event.origin,
+          request.blockchain ?? Blockchain.SOLANA
         );
         const signedTx = VersionedTransaction.deserialize(decode(tx));
         signedTx.addSignature(new PublicKey(publicKey), decode(signature));
@@ -349,11 +353,12 @@ export class SVMService {
     user: SecureUserType,
     publicKey: string,
     tx: string,
-    origin: SecureEventOrigin
+    origin: SecureEventOrigin,
+    blockchain: Blockchain
   ): Promise<{ signature: string }> {
     const blockchainKeyring = this.keyringStore
       .getUserKeyring(user.user.uuid)
-      ?.keyringForBlockchain(Blockchain.SOLANA);
+      ?.keyringForBlockchain(blockchain);
 
     if (!blockchainKeyring) {
       throw new Error("invariant violation: BlockchainKeyring not found");
@@ -405,11 +410,12 @@ export class SVMService {
     user: SecureUserType,
     publicKey: string,
     message: string,
-    origin: SecureEventOrigin
+    origin: SecureEventOrigin,
+    blockchain: Blockchain
   ): Promise<{ signature: string }> {
     const blockchainKeyring = this.keyringStore
       .getUserKeyring(user.user.uuid)
-      ?.keyringForBlockchain(Blockchain.SOLANA);
+      ?.keyringForBlockchain(blockchain);
 
     if (!blockchainKeyring) {
       throw new Error("invariant violation: BlockchainKeyring not found");
