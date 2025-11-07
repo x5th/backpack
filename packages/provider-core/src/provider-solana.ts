@@ -268,7 +268,7 @@ export class ProviderSolanaInjection
       return { publicKey: this.#publicKey };
     }
     const result = await this.#secureSolanaClient.wallet.connect({
-      blockchain: Blockchain.SOLANA,
+      blockchain: Blockchain.X1,
       silent: options?.onlyIfTrusted,
     });
     this.#connect(result.publicKey, result.connectionUrl);

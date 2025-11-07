@@ -146,7 +146,7 @@
     <div id="txHistory" style="font-family: 'Monaco', 'Courier New', monospace; font-size: 12px;"></div>
   </div>
 
-  <script src="https://unpkg.com/@solana/web3.js@1.87.6/lib/index.iife.min.js"></script>
+  <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
   <script>
     let wallet = null;
     let connection = null;
@@ -238,8 +238,8 @@
         const toPubkey = new solanaWeb3.PublicKey(recipient);
         const lamports = Math.floor(amount * 1e9);
 
-        // Get recent blockhash
-        const { blockhash } = await connection.getLatestBlockhash();
+        // Get recent blockhash with finalized commitment
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
 
         // Create transaction
         const transaction = new solanaWeb3.Transaction({
@@ -257,8 +257,11 @@
 
         statusEl.innerHTML = '<div class="status info">🔄 Waiting for signature...</div>';
 
-        // Request signature from wallet
-        const signed = await wallet.signAndSendTransaction(transaction);
+        // Request signature from wallet with options
+        const signed = await wallet.signAndSendTransaction(transaction, {
+          skipPreflight: false,
+          preflightCommitment: 'finalized',
+        });
 
         statusEl.innerHTML = `
           <div class="status success">
