@@ -70,8 +70,13 @@ export function ImportWallets({
   const [balances, setBalances] = useState<{
     [publicKey: string]: BigNumber;
   } | null>(null);
+  // For Ledger (mnemonic === undefined), default to first derivation path option instead of "Funded Addresses"
+  const defaultLabel =
+    mnemonic === undefined
+      ? derivationPathOptions[0].label
+      : fundedAddressesLabel;
   const [derivationPathLabel, setDerivationPathLabel] =
-    useState<string>(fundedAddressesLabel);
+    useState<string>(defaultLabel);
   const [derivationPathInput, setDerivationPathInput] = useState(
     derivationPathOptions[0].pattern
   );
@@ -117,20 +122,20 @@ export function ImportWallets({
       const walletPreview =
         mnemonic === undefined
           ? ({
-            type: BlockchainWalletPreviewType.HARDWARE,
-            derivationPaths: fetchDerivationPaths,
-            blockchain,
-          } as BlockchainWalletPublicKeyRequest<BlockchainWalletPreviewType.HARDWARE>)
+              type: BlockchainWalletPreviewType.HARDWARE,
+              derivationPaths: fetchDerivationPaths,
+              blockchain,
+            } as BlockchainWalletPublicKeyRequest<BlockchainWalletPreviewType.HARDWARE>)
           : ({
-            type: BlockchainWalletPreviewType.MNEMONIC,
-            mnemonic: typeof mnemonic === "string" ? mnemonic : undefined,
-            derivationPaths: fetchDerivationPaths,
-            blockchain,
-          } as BlockchainWalletPublicKeyRequest<BlockchainWalletPreviewType.MNEMONIC>);
+              type: BlockchainWalletPreviewType.MNEMONIC,
+              mnemonic: typeof mnemonic === "string" ? mnemonic : undefined,
+              derivationPaths: fetchDerivationPaths,
+              blockchain,
+            } as BlockchainWalletPublicKeyRequest<BlockchainWalletPreviewType.MNEMONIC>);
 
       return safeClientResponse(userClient.previewWallets(walletPreview))
         .then((result_) => {
-          setLoadPublicKeysError(false)
+          setLoadPublicKeysError(false);
           const result = result_.wallets[0].walletDescriptors.map(
             (descriptor) => ({
               ...descriptor,
@@ -153,9 +158,10 @@ export function ImportWallets({
             return result.find((fetched) => fetched.derivationPath === path)!;
           });
         })
-        .catch(() => {
-          setLoadPublicKeysError(true)
-          return []
+        .catch((error) => {
+          console.error("previewWallets error:", error);
+          setLoadPublicKeysError(true);
+          return [];
         });
     },
     [blockchain, userClient, walletDescriptorsCache]
@@ -203,6 +209,7 @@ export function ImportWallets({
     }
 
     setCheckedWalletDescriptors([]);
+    setLoadPublicKeysError(false);
 
     loadPublicKeys(derivationPaths, mnemonic)
       .then(
@@ -213,6 +220,13 @@ export function ImportWallets({
             blockchain: Blockchain;
           }[]
         ) => {
+          // If empty array returned (likely due to error), set states and return early
+          if (newWalletDescriptors.length === 0) {
+            setWalletDescriptors([]);
+            setBalances({});
+            return;
+          }
+
           if (!isFundedAddresses) {
             setWalletDescriptors(newWalletDescriptors);
           }
@@ -253,7 +267,10 @@ export function ImportWallets({
       )
       .catch((error) => {
         // Probably Ledger error, i.e. app is not opened
-        console.error(error);
+        console.error("fetchPublicKeys error:", error);
+        // Set walletDescriptors to empty array so UI shows error state instead of loading
+        setWalletDescriptors([]);
+        setBalances({});
         // if (onError) {
         //   // Call custom error handler if one was passed
         //   onError(error);
@@ -272,7 +289,6 @@ export function ImportWallets({
     // setWalletDescriptors,
   ]);
 
-
   useEffect(() => {
     fetchPublicKeys();
   }, [fetchPublicKeys]);
@@ -282,6 +298,9 @@ export function ImportWallets({
   //
   useEffect(
     () => {
+      // For Ledger hardware wallets, check fewer addresses for better UX (faster)
+      const loadAmount = mnemonic === undefined ? 3 : LOAD_PUBLIC_KEY_AMOUNT;
+
       if (derivationPathLabel === fundedAddressesLabel) {
         const paths: { [path: string]: true } = {
           [derivationPathPrefix]: true, // original path
@@ -293,7 +312,7 @@ export function ImportWallets({
         ].forEach((derivationPathOption) => {
           iterateDerivationPathPattern(
             derivationPathOption.pattern,
-            LOAD_PUBLIC_KEY_AMOUNT
+            loadAmount
           ).forEach((path) => {
             paths[path] = true;
           });
@@ -313,10 +332,7 @@ export function ImportWallets({
         }
         if (derivationPathPattern!.includes("x")) {
           setDerivationPaths(
-            iterateDerivationPathPattern(
-              derivationPathPattern!,
-              LOAD_PUBLIC_KEY_AMOUNT
-            )
+            iterateDerivationPathPattern(derivationPathPattern!, loadAmount)
           );
         } else {
           setDerivationPaths([derivationPathPattern]);
@@ -376,13 +392,14 @@ export function ImportWallets({
   const renderItem = useCallback(
     (item: WalletDescriptor) => {
       const { publicKey, derivationPath } = item;
-      const displayBalance = `${balances?.[publicKey]
-        ? (+ethers.utils.formatUnits(
-          balances?.[publicKey],
-          decimals
-        )).toFixed(4)
-        : "-"
-        } ${symbol}`;
+      const displayBalance = `${
+        balances?.[publicKey]
+          ? (+ethers.utils.formatUnits(
+              balances?.[publicKey],
+              decimals
+            )).toFixed(4)
+          : "-"
+      } ${symbol}`;
 
       const label = formatWalletAddress(item.publicKey, 5);
       const disabled = isDisabledPublicKey(publicKey);
@@ -502,7 +519,7 @@ export function ImportWallets({
       <YStack f={1} width="100%">
         <Scrollbar style={{ flex: 1 }}>
           {walletDescriptors === null ||
-            (balances === null && isFundedAddresses) ? (
+          (balances === null && isFundedAddresses) ? (
             <Loader />
           ) : !derivationPathInputError && walletDescriptors.length > 0 ? (
             <YStack space="$2" paddingHorizontal="$4">
@@ -524,7 +541,7 @@ export function ImportWallets({
           <BpPrimaryButton
             label={t("try_again")}
             onPress={() => {
-              fetchPublicKeys()
+              fetchPublicKeys();
             }}
           />
         ) : (
