@@ -44,22 +44,22 @@ function TestnetBanner() {
   const connectionUrl = useRecoilValue(blockchainConnectionUrl(blockchain));
   const developerMode = useRecoilValue(isDeveloperMode);
 
-  // Determine network name based on blockchain and connection URL
+  // Determine network name based on connection URL
+  // Since we treat Solana networks as alternative RPCs for X1, we check the URL directly
   const getNetworkName = () => {
-    if (blockchain === Blockchain.X1) {
-      if (connectionUrl === "https://rpc.testnet.x1.xyz") {
-        return developerMode ? "X1 TESTNET • DEVELOPER MODE" : "X1 TESTNET";
-      } else if (connectionUrl === "https://rpc.mainnet.x1.xyz") {
-        return developerMode ? "X1 MAINNET • DEVELOPER MODE" : "X1 MAINNET";
-      }
-    } else if (blockchain === Blockchain.SOLANA) {
-      if (connectionUrl === "https://api.mainnet-beta.solana.com") {
-        return "SOLANA MAINNET";
-      } else if (connectionUrl === "https://api.devnet.solana.com") {
-        return "SOLANA DEVNET";
-      } else if (connectionUrl === "https://api.testnet.solana.com") {
-        return "SOLANA TESTNET";
-      }
+    // Check X1 URLs
+    if (connectionUrl === "https://rpc.testnet.x1.xyz") {
+      return developerMode ? "X1 TESTNET • DEVELOPER MODE" : "X1 TESTNET";
+    } else if (connectionUrl === "https://rpc.mainnet.x1.xyz") {
+      return developerMode ? "X1 MAINNET • DEVELOPER MODE" : "X1 MAINNET";
+    }
+    // Check Solana URLs
+    else if (connectionUrl === "https://api.mainnet-beta.solana.com") {
+      return developerMode ? "SOLANA MAINNET • DEVELOPER MODE" : "SOLANA MAINNET";
+    } else if (connectionUrl === "https://api.devnet.solana.com") {
+      return developerMode ? "SOLANA DEVNET • DEVELOPER MODE" : "SOLANA DEVNET";
+    } else if (connectionUrl === "https://api.testnet.solana.com") {
+      return developerMode ? "SOLANA TESTNET • DEVELOPER MODE" : "SOLANA TESTNET";
     }
     return null;
   };
