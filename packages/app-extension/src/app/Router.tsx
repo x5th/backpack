@@ -47,7 +47,7 @@ function TestnetBanner() {
 
   // Log network status for debugging
   console.log(
-    `[X1 Network ext:0.10.59] Blockchain: ${blockchain}, URL: ${connectionUrl}, IsTestnet: ${isX1Testnet}`
+    `[X1 Network ext:0.10.61] Blockchain: ${blockchain}, URL: ${connectionUrl}, IsTestnet: ${isX1Testnet}`
   );
 
   if (!isX1Testnet) {

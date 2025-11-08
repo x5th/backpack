@@ -1,0 +1,773 @@
+[33mcommit 793c5580c91931c99922223853c1d17ccb0e2f4d[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m
+Merge: d75cff4 0d45aac
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 14:45:39 2025 -1000
+
+    Merge remote-tracking branch 'origin/improve-ledger-hw-wallet-integration'
+
+[33mcommit d75cff4bee80821f6fa754f535e5cabd263c865b[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 14:43:17 2025 -1000
+
+    Complete GraphQL removal with stub implementations and X1 Wallet rebranding
+    
+    This commit finalizes the GraphQL dependency removal and completes the
+    X1 Wallet rebranding across login and onboarding screens.
+    
+    ## GraphQL Stubbing
+    - Created stub apollo modules in data-components and recoil packages
+    - Implemented null/stub exports for GraphQL queries and types
+    - Added stub gql function and swap-related query exports
+    - All GraphQL-dependent features now gracefully handle stub implementations
+    - Extension builds successfully with all 16 packages compiling
+    
+    ## X1 Wallet Branding
+    - Replaced Backpack logo with official X1 PNG logo (96x96) on all screens
+    - Login/lock screen: X1 logo + "X1 WALLET" text
+    - Welcome screen: X1 logo + "Welcome to X1 Wallet"
+    - Setup complete screen: X1 logo in support section
+    - All screens now use official x1.png asset
+    
+    ## Technical Details
+    - Restored TypeScript build for data-components package
+    - Added stub apollo directories (previously gitignored)
+    - Fixed duplicate export warnings by using existing component implementations
+    - Maintained backward compatibility with existing imports
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 0d45aaca8ecb9117fbfac0c2fa0f2a32dc4928bc[m[33m ([m[1;31morigin/improve-ledger-hw-wallet-integration[m[33m)[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 14:42:17 2025 -1000
+
+    Improve Ledger hardware wallet integration
+    
+    - Update Ledger packages to latest versions:
+      - @ledgerhq/hw-app-solana: 7.1.3 → 7.5.3
+      - @ledgerhq/hw-transport-webhid: 6.28.3 → 6.30.5
+      - @ledgerhq/hw-app-eth: 6.35.4 → 6.37.3
+      - @ledgerhq/hw-transport: 6.30.3 → 6.31.3
+    
+    - Add X1 and Eclipse blockchain support for Ledger hardware wallets
+      (uses Solana Ledger app since they're Solana-based chains)
+    
+    - Fix blank screen issue when connecting Ledger for hardware wallet import
+    
+    - Optimize Ledger UX by reducing derivation path checks from 118 to 3 for faster loading
+    
+    - Fix TypeScript type safety issues (remove 'as any' casts)
+    
+    - Enhance error handling with Ledger Live conflict detection and better user messages
+    
+    - Add dependency resolutions to prevent version conflicts
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 9351869f5ffec519eaef03a8fdd0a745e7ffeb85[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 14:06:47 2025 -1000
+
+    Optimize X1 logo with base64 data URI and complete GraphQL removal
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit c195ca24a37da9c429efffac9b676fc40fb3fd00[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mstyle-experiment[m[33m, [m[1;32mremove-getbalance-calls[m[33m)[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 11:37:21 2025 -1000
+
+    Disable token detail navigation to prevent errors
+    
+    Remove onItemClick handler from TokenBalances component to prevent
+    navigation to TokensDetailScreen which was causing "Cannot destructure
+    property 'publicKey'" errors when clicking on tokens.
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit bdcae407ffc39671546276b913a4ee67cba0186f[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 11:28:54 2025 -1000
+
+    Update x1-json-server: Add Ethereum RPC proxy and fix X1 logo
+    
+    - Add ethereum-rpc-proxy endpoint that proxies requests to eth.llamarpc.com
+    - Replace Solana logo with X1 logo for XNT token (both success and error cases)
+    - Server now listens on 0.0.0.0 to accept external connections
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit c0b26f4976ea529d0c22bd24a188b97d6d347a28[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 10:44:22 2025 -1000
+
+    Replace all localhost and xnftdata URLs with remote server
+    
+    Replaced all URL references throughout the codebase:
+    - http://localhost:4000 → http://162.250.126.66:4000
+    - https://swr.xnftdata.com/rpc-proxy/ → http://162.250.126.66:4000
+    
+    Updated 18 files across multiple packages:
+    - Blockchain configs (Ethereum, Solana, Eclipse, X1)
+    - RPC clients and connections
+    - API endpoints for Jupiter, Blowfish, feature gates
+    - Backend API and avatar URLs
+    - Token balance and transaction UI components
+    
+    All services now point to remote server at 162.250.126.66:4000.
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 8ece1a27311e44320d39e14249f3991006eac423[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 10:36:22 2025 -1000
+
+    Disable Solana blockchain support
+    
+    Set Solana blockchain config to Enabled: false to prevent
+    unnecessary Solana RPC calls when using X1 wallet.
+    
+    Now only X1 and Eclipse blockchains are enabled.
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit d4f12e03ebe618bc701589ceff2adb4180f90836[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 10:35:42 2025 -1000
+
+    Disable Ethereum blockchain support
+    
+    Set Ethereum blockchain config to Enabled: false to prevent
+    ethereum-rpc-proxy calls when using X1 wallet.
+    
+    This stops the wallet from initializing Ethereum blockchain
+    clients and making unnecessary RPC calls when on other chains.
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit cdf3e1faaf14752e36de6cc178a665b45674101e[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 10:32:05 2025 -1000
+
+    Remove Solana RPC proxy reference from example client
+    
+    Removed rpc-proxy reference from examples/clients/simple:
+    - SolanaWallet.tsx: Removed localhost:4000/rpc-proxy conditional,
+      now uses standard clusterApiUrl for all networks
+    
+    Kept ethereum-rpc-proxy in blockchain configs as it's still needed.
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 9db2c3499581d280e3cc0144937e1c3f59d5fea0[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 10:27:25 2025 -1000
+
+    Fix remaining xnft references in app-extension
+    
+    Complete xnft removal from app-extension package by fixing all
+    remaining TypeScript errors:
+    
+    - src/components/Unlocked/Apps/index.tsx: Remove XNFT_GG_LINK,
+      filteredPlugins, useOpenPlugin imports; stub with empty arrays
+    - src/components/Unlocked/Apps/Plugin.tsx: Remove useClosePlugin,
+      useFreshPlugin, useOpenPlugin, usePlugins; stub functionality
+    - src/components/Unlocked/Apps/Renderer.tsx: Remove xnftPreference
+      import and usage
+    - src/components/Unlocked/Apps/Simulator.tsx: Remove SIMULATOR_URL
+      import, stub with localhost
+    - src/components/Unlocked/Settings/Xnfts/Detail.tsx: Remove
+      UI_RPC_METHOD_SET_XNFT_PREFERENCES and BAKED_IN_XNFTS imports
+    - src/components/Unlocked/Settings/Xnfts/index.tsx: Fix contents
+      type annotation
+    
+    Build now passes successfully with all xnft references removed.
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 609e52f418c8f9ba48c448d5669b50fd4c949184[m[33m ([m[1;31morigin/remove-getbalance-calls[m[33m)[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 10:16:37 2025 -1000
+
+    Remove all xnft/xNFT references from codebase
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit eae6ff6eaec2a7cb88b1d74a3f6b3f09eea1ccb9[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 09:52:27 2025 -1000
+
+    Remove all xnftdata.com references
+    
+    Replaced all xnftdata.com URLs with localhost:4000:
+    - Blowfish URLs: Ethereum and Eclipse now use localhost:4000
+    - Image proxy removed: proxyImageUrl now returns URLs as-is
+    - Gateway removed: Removed xnftdata.com gateway for IPFS/Arweave
+    
+    All external services now route through localhost:4000 API.
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit ce9c318bd4eaac7084550438f90ace340d1f842b[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 09:47:50 2025 -1000
+
+    Update build-clean.sh to use Bun for faster builds
+    
+    Modified build script to:
+    - Detect if Bun is installed
+    - Use Bun for builds (faster than Yarn)
+    - Fall back to Yarn if Bun not available
+    - Display Bun version during build
+    
+    This can significantly speed up builds, especially for fresh builds.
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit c7f3906f78d20d76d7cdb19e070971a1d004dff9[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 09:45:34 2025 -1000
+
+    Add build-clean.sh script to repository
+    
+    Added clean build script that:
+    - Clears all build caches (.turbo, node_modules/.cache, dist, build)
+    - Runs full build with --force flag
+    - Verifies built version matches source version
+    - Updates file timestamps for Chrome reload
+    - Provides detailed next steps for Chrome extension loading
+    
+    Usage: ./build-clean.sh
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 3739f5777bdc5a33b8284e9a677a0ff363bf98d9[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 09:45:16 2025 -1000
+
+    Restore rpc-proxy URLs to localhost:4000
+    
+    Restored Ethereum and Solana RPC proxy endpoints to point to localhost:4000:
+    - Ethereum: http://localhost:4000/ethereum-rpc-proxy
+    - Solana: http://localhost:4000/rpc-proxy/
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 6c6964dbff1a121a8c40644ba95993cc78fec940[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 09:41:38 2025 -1000
+
+    Fix X1 testnet explorer URLs
+    
+    When on X1 testnet, clicking "View on Explorer" now correctly opens
+    https://explorer.testnet.x1.xyz instead of the mainnet explorer.
+    
+    Changes:
+    - Added X1_TESTNET_EXPLORER to explorer constants
+    - Updated explorerUrl(), explorerAddressUrl(), and explorerNftUrl() to check
+      connection URL and use testnet explorer when on testnet
+    - Added both mainnet and testnet explorer options to X1 config
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit ce91f8e029e2572ad32cae906b69b339f1b54f68[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 09:35:38 2025 -1000
+
+    Fix X1 testnet banner TypeScript error
+    
+    Changed fontSize from "10px" string to numeric 10 for Tamagui StyledText compatibility.
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit d8fbf4b8e45fe3f11c13522720dc2a627ae3ba3e[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 09:29:21 2025 -1000
+
+    Make X1 TESTNET banner smaller and non-intrusive
+    
+    - Reduce banner height from 32px to 16px (half the size)
+    - Reduce icon size from $sm to 12px
+    - Reduce font size from $xs to 10px
+    - Reduce padding and gap for compact design
+    - Remove dynamic height adjustment that pushed content down
+    - Banner now overlays content instead of pushing buttons lower
+    
+    The banner is now 50% smaller and doesn't affect page layout.
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 30fd407a0bb629bf3af98c61ba97909567a9ebf1[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 09:28:16 2025 -1000
+
+    Remove rpc-proxy references from codebase
+    
+    - Replace http://localhost:4000/ethereum-rpc-proxy with https://ethereum-rpc.publicnode.com
+    - Remove http://localhost:4000/rpc-proxy/ from SolanaWallet example
+    - Use public RPC endpoints instead of local proxy
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit b9317e74124b106bbce88de2f4a8669791767f7f[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 08:55:12 2025 -1000
+
+    Experiment: Remove all RPC getBalance calls from codebase
+    
+    This is an experimental commit to completely eliminate direct RPC
+    getBalance calls and rely exclusively on the localhost:4000 API
+    for balance information.
+    
+    Changes made:
+    - Deleted X1DataProvider.tsx which was using connection.getBalance()
+      for balance display
+    - Removed connection.getBalance() from NewStakeScreen.tsx (staking UI)
+      - Now returns null, needs API integration
+    - Removed connection.getBalance() from SolanaStakeClient withdraw
+      - Now uses 0 as placeholder, needs API integration
+    - Removed connection.getBalance() from solanaTransactionAtom gas check
+      - Now returns true by default, needs API integration
+    - Removed connection.getBalance() from swap token account check
+      - Now assumes account creation fee needed, needs API integration
+    
+    All balance fetching should now go through http://localhost:4000/wallet
+    API endpoint with proper providerId (X1-testnet/X1-mainnet) detection.
+    
+    Build status: ✓ Successful (exit code 0)
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit f25cc7ba6f835667dd0735fb4077da63842fd1d8[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Fri Nov 7 05:55:47 2025 -1000
+
+    Remove Apollo GraphQL and replace with REST API calls to localhost:4000
+    
+    Major architectural change to support X1 blockchain integration:
+    
+    - Removed all Apollo GraphQL queries and replaced with direct REST fetch calls
+    - Extension now fetches wallet/token data from http://localhost:4000
+    - Added window.x1 provider for X1 blockchain wallet detection
+    - Fixed SendAmountSelectScreen black screen issue by fetching token data via REST
+    - Removed Apollo cache dependencies from confirmation screens
+    - Added debugging logs throughout wallet connection flow
+    - Version bumped to 0.10.47
+    
+    Files modified:
+    - Provider injection: Added X1 provider to window.x1
+    - Token balances: REST API polling instead of GraphQL
+    - Send flow: Direct REST fetch for token data
+    - Confirmation screens: Removed Apollo cache refresh calls
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 6639cf94583026b58eab7c6220bc41da501f9041[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Thu Nov 6 20:27:25 2025 -1000
+
+    Fix X1 wallet connection and transaction signing in test page
+    
+    - Change provider to use Blockchain.X1 instead of hardcoded SOLANA
+      This allows the wallet to connect with X1 accounts instead of
+      requiring Solana accounts
+    
+    - Fix Buffer polyfill issues in test page by switching to browser-
+      compatible @solana/web3.js IIFE build that includes all polyfills
+    
+    - Improve transaction reliability by using finalized commitment for
+      blockhash and adding preflightCommitment option
+    
+    This resolves the "No wallet found" error when connecting from the
+    test page with X1 accounts configured in Backpack wallet.
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 1c04aaa5c4b5dc8d3442cc02c30e250cd3ab81b2[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Thu Nov 6 19:49:13 2025 -1000
+
+    Add comprehensive documentation for X1 JSON server
+    
+    Detailed technical documentation explaining the X1 JSON server's purpose,
+    architecture, API endpoints, and integration with Backpack wallet.
+    
+    Contents:
+    - Overview and purpose
+    - Architecture diagram showing data flow
+    - API endpoint specifications with examples
+    - Configuration and setup instructions
+    - Development workflow and debugging
+    - Production considerations and security
+    - Troubleshooting guide
+    - Related documentation links
+    
+    This helps developers understand how the local development server provides
+    X1 blockchain data to the wallet during testing.
+    
+    🤖 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 6066f4a319fca1c7ef8e4bb7b152767995b65b4e[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Thu Nov 6 19:47:30 2025 -1000
+
+    Add wallet injection detection and retry logic to test page
+    
+    Improves reliability of wallet connection by waiting for the Backpack
+    extension's content script to inject window.backpack.
+    
+    Changes:
+    - Wait up to 3 seconds for wallet injection before showing error
+    - Add console logging to debug injection issues
+    - Better error message with troubleshooting instructions
+    - Auto-detect and log available wallet providers
+    
+    This fixes the "No wallet found" error that occurs when the page loads
+    before the extension content script has injected the wallet API.
+    
+    🤖 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 692e324d3287939f6f4ab1e24900a50ac246b4e1[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Thu Nov 6 19:44:35 2025 -1000
+
+    Add test page route to X1 JSON server
+    
+    Serve the X1 transaction signing test page at /test endpoint on the same
+    port as the JSON API (4000), eliminating the need for a separate server.
+    
+    Changes:
+    - Add GET /test endpoint to serve x1-test-signing.html
+    - Update startup message to show test page URL
+    - Single server for both API and testing interface
+    
+    Usage:
+      node x1-json-server.js
+      API: http://localhost:4000/wallet/:address?providerId=X1
+      Test: http://localhost:4000/test
+    
+    🤖 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 9f3738e321dbc4d367cae56eafab19782f29a116[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Thu Nov 6 19:43:30 2025 -1000
+
+    Add X1 transaction signing test page
+    
+    Simple web interface for testing X1 blockchain transaction signing and
+    message signing with the Backpack wallet.
+    
+    Features:
+    - Wallet connection with balance display
+    - Transfer XNT tokens between addresses
+    - Sign arbitrary messages
+    - Transaction history log
+    - Real-time balance updates
+    - Direct links to X1 explorer
+    
+    Usage:
+      node test-server.js
+      Visit http://localhost:3000
+    
+    Requirements:
+    - Backpack extension with X1 support loaded
+    - X1 JSON server running on port 4000
+    - Chrome/browser with extension installed
+    
+    🤖 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 52afd71394a8299ce4c3555f4a1d1830bcaac117[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Thu Nov 6 19:40:19 2025 -1000
+
+    Skip SOL gas check for X1 transactions
+    
+    The gas check uses solanaPublicKeyHasGas which checks SOL balance, but X1
+    transactions use XNT for gas fees. This was causing a false "Not enought SOL
+    to pay for gas" error even when users had sufficient XNT balance.
+    
+    Changes:
+    - Skip gas balance warning for X1 transactions
+    - X1 uses XNT (not SOL) for transaction fees
+    - Prevents misleading "insufficient SOL" error
+    
+    This allows X1 transactions to proceed to approval without the incorrect
+    gas warning, since X1 has its own native token (XNT) for fees.
+    
+    🤖 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 2d636a82c1e6f05d60372d748b11845890442ed5[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Thu Nov 6 19:33:02 2025 -1000
+
+    Skip Blowfish security evaluation for X1 transactions
+    
+    Blowfish transaction scanning service does not support X1 blockchain yet,
+    causing "Simulation failed" errors that block transaction signing.
+    
+    Changes:
+    - Detect X1 transactions via blockchain parameter
+    - Skip "Simulation failed" warning dialog for X1
+    - Suppress Blowfish errors for X1 transactions
+    - Allow X1 transactions to proceed directly to approval UI
+    
+    This eliminates the confusing "Simulation failed" popup when signing X1
+    transactions, providing a smoother user experience while Blowfish adds
+    X1 support.
+    
+    🤖 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit da42f6676ce7b6773e43d563bd987f491a09da77[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Thu Nov 6 18:59:42 2025 -1000
+
+    Add testing guide for X1 keyring fix
+    
+    Documents manual testing procedures for verifying the X1 blockchain keyring
+    fix in the Backpack wallet Chrome extension.
+    
+    Covers:
+    - Extension installation and setup
+    - X1 JSON server startup
+    - Transaction signing workflow
+    - Expected behaviors and error checking
+    
+    This guide helps developers manually verify that X1 transactions can be
+    signed successfully after the keyring lookup fix.
+    
+    🤖 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 5b69cb4068d9d53e8d6e52f8c3449a8fdf4211a8[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Thu Nov 6 18:59:34 2025 -1000
+
+    Add X1 JSON server with GraphQL and transaction scan endpoints
+    
+    This server provides wallet balance and token price data for X1 blockchain
+    integration with Backpack wallet. It replaces the need for external APIs by
+    serving data directly to the Apollo GraphQL interceptor.
+    
+    Features:
+    - Fetches real-time balance from X1 RPC (https://rpc.mainnet.x1.xyz)
+    - Returns XNT token data with $1.00 price
+    - Handles GraphQL queries for priority fees
+    - Provides transaction scan endpoint for security checks
+    - CORS enabled for local development
+    
+    Endpoints:
+    - GET /wallet/:address?providerId=X1 - Wallet balance and token data
+    - POST /v2/graphql - GraphQL queries (priority fees)
+    - GET /solana/v0/:network/scan/transactions - Transaction security scan
+    
+    The server runs on port 4000 and is referenced in packages/common/src/constants.ts
+    via X1_JSON_SERVER_URL constant.
+    
+    🤖 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit f1b5ca8e1348f6ee04373564505db08f34e2f244[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Thu Nov 6 18:39:59 2025 -1000
+
+    Fix X1 keyring lookup bug in transaction signing
+    
+    This commit fixes the bug where X1 transactions fail with "no keyring for
+    solana" error by making the blockchain parameter dynamic in keyring lookups.
+    
+    Problem:
+    When users attempted to sign X1 transactions, the request correctly included
+    blockchain: "x1", and this was properly logged and passed to approveOrigin().
+    However, getTransactionSignature() and getMessageSignature() used hardcoded
+    Blockchain.SOLANA when looking up the keyring, causing the error.
+    
+    Root Cause:
+    - server.ts:356: .keyringForBlockchain(Blockchain.SOLANA) <- HARDCODED
+    - server.ts:412: .keyringForBlockchain(Blockchain.SOLANA) <- HARDCODED
+    
+    These methods were not receiving the blockchain parameter from their callers,
+    resulting in always looking for a "solana" keyring even for X1 transactions.
+    
+    Solution:
+    1. Added blockchain: Blockchain parameter to getTransactionSignature()
+    2. Added blockchain: Blockchain parameter to getMessageSignature()
+    3. Updated both methods to use blockchain parameter instead of hardcoded value
+    4. Passed blockchain from request in all 4 call sites:
+       - handleSign (line 288)
+       - handleSignMessage (line 234)
+       - handleSignIn (line 191)
+       - handleSignAll (line 338)
+    
+    Changes:
+    - getTransactionSignature: Added blockchain parameter, use it in keyring lookup
+    - getMessageSignature: Added blockchain parameter, use it in keyring lookup
+    - All callers: Pass event.request.blockchain ?? Blockchain.SOLANA
+    
+    Backward Compatibility:
+    The fallback pattern (blockchain ?? Blockchain.SOLANA) ensures old clients
+    without the blockchain field continue to work with Solana.
+    
+    Testing:
+    ✅ Extension builds successfully
+    ✅ Test suite validates bug reproduction and fix
+    ✅ Run: node packages/secure-background/X1_KEYRING_BUG_TEST.js
+    
+    Related:
+    - Test suite in commit 3742803e
+    - See X1_KEYRING_BUG_README.md for detailed analysis
+    - See TESTING_GUIDE.md for manual testing instructions
+    
+    🤖 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 3742803ec0cf5548fecfb5336865c4a7f69feeb4[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Thu Nov 6 18:30:36 2025 -1000
+
+    Add comprehensive test suite for X1 keyring bug
+    
+    This test suite reproduces and documents the X1 keyring lookup bug where
+    SECURE_SVM_SIGN_TX requests fail with "no keyring for solana" error.
+    
+    Bug Location:
+    - packages/secure-background/src/services/svm/server.ts:356
+      .keyringForBlockchain(Blockchain.SOLANA) <- hardcoded
+    - packages/secure-background/src/services/svm/server.ts:412
+      .keyringForBlockchain(Blockchain.SOLANA) <- hardcoded
+    
+    Root Cause:
+    When signing X1 transactions, the request correctly includes blockchain: "x1",
+    and this is properly logged and passed to approveOrigin(). However,
+    getTransactionSignature() and getMessageSignature() do not receive the
+    blockchain parameter and use hardcoded Blockchain.SOLANA when looking up
+    the keyring, causing "no keyring for solana" error for X1 users.
+    
+    Test Files Added:
+    - X1_KEYRING_BUG_TEST.js: Standalone test (run with node)
+      Reproduces bug, demonstrates fix, verifies backward compatibility
+    
+    - X1_KEYRING_BUG_README.md: Complete documentation
+      Detailed analysis, code changes required, testing instructions
+    
+    - src/services/svm/__tests__/x1-keyring-fix.test.ts: Jest test suite
+      Comprehensive tests for all affected handlers
+    
+    - src/services/svm/__tests__/x1-keyring-manual-test.ts: Detailed analysis
+      TypeScript documentation with code examples
+    
+    Running the Test:
+      node packages/secure-background/X1_KEYRING_BUG_TEST.js
+    
+    Test Results:
+    ✅ TEST 1: Reproduces bug with "no keyring for solana" error
+    ✅ TEST 2: Demonstrates fix resolves the issue
+    ✅ TEST 3: Verifies backward compatibility (Solana fallback)
+    
+    Fix Required:
+    Add blockchain parameter to getTransactionSignature() and
+    getMessageSignature() methods, and pass it from the request handlers.
+    
+    🤖 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+[33mcommit 35ea8cd0fc458d99b2a4b88a819ad94c07c61f7d[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Thu Nov 6 18:12:02 2025 -1000
+
+    Add comprehensive summary documentation for X1 keyring fix
+
+[33mcommit da13d304d01b400c3e104767252fb6b79861ef5e[m
+Author: Jack Levin <jack@x1.xyz>
+Date:   Thu Nov 6 18:09:22 2025 -1000
+
+    Add X1 blockchain support and fix keyring lookup
+    
+    Features:
+    - Add X1 blockchain configuration and support
+    - X1 uses SVM (Solana Virtual Machine) compatibility
+    - Add X1 RPC endpoint: https://rpc.mainnet.x1.xyz
+    - Add X1 explorer: https://explorer.x1.xyz
+    - Add X1 logo and UI integration
+    
+    Fixes:
+    - Fix "no keyring for solana" error when using X1 blockchain
+    - Add blockchain parameter to all SVM event types (SIGN_TX, SIGN_MESSAGE, SIGN_ALL_TX)
+    - Pass blockchain from SolanaClient through BackpackSolanaWallet to secure backend
+    - Update server.ts to use request.blockchain instead of hardcoded Blockchain.SOLANA
+    - Add console.log statements for debugging blockchain parameter flow
+    
+    Files Changed:
+    - packages/secure-background/src/services/svm/events.ts - Add blockchain field to event types
+    - packages/secure-background/src/services/svm/server.ts - Use dynamic blockchain parameter
+    - packages/secure-clients/src/SolanaClient/SolanaClient.ts - Store and pass blockchain
+    - packages/secure-clients/src/SolanaClient/BackpackSolanaWallet.ts - Pass blockchain in all signing methods
+    - packages/secure-clients/src/createBlockchainClient.ts - Create SolanaClient for X1
+    - packages/secure-background/src/blockchain-configs/x1/ - X1 blockchain configuration
+    - packages/common/src/constants.ts - Add X1 constants
+    - packages/app-extension/src/manifest.json - Version 0.10.37
+    
+    🤖 Generated with Claude Code
+
+[33mcommit 5a538a41d060d2c48507007f96c766483115aecc[m
+Author: Armani Ferrante <armaniferrante@gmail.com>
+Date:   Wed Feb 14 20:22:33 2024 +0900
+
+    v0.10.30
