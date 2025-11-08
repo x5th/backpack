@@ -129,21 +129,22 @@ export function WalletSwitcherBottomSheet({
       snapPoints={[50]}
       zIndex={910_000}
       animation="quick"
-      modal={false}
+      modal
+      dismissOnSnapToBottom
       disableDrag
     >
       <Sheet.Overlay
         backgroundColor={theme.baseBackgroundL1.val}
         opacity={0.4}
-        zIndex={110_000}
+        animation="lazy"
+        enterStyle={{ opacity: 0 }}
+        exitStyle={{ opacity: 0 }}
       />
       <Sheet.Frame
-        position="relative"
         borderColor="$borderColor"
         borderWidth="$1"
         borderBottomWidth={0}
         borderTopWidth={0}
-        zIndex={110_000}
         backgroundColor={theme.baseBackgroundL0.val}
       >
         <YStack height="100%">
@@ -176,6 +177,8 @@ export function WalletSwitcherBottomSheet({
                       }}
                       cursor={!isActive ? "pointer" : undefined}
                       onPress={async () => {
+                        // Close the sheet immediately for better UX
+                        setOpen(false);
                         if (!isActive) {
                           await userClient.setActiveWallet({
                             uuid: user.user.uuid,
@@ -183,7 +186,6 @@ export function WalletSwitcherBottomSheet({
                             publicKey,
                           });
                         }
-                        setOpen(false);
                       }}
                     >
                       <Image
