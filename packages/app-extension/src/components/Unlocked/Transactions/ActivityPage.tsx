@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { Blockchain } from "@coral-xyz/common";
 import { Loading } from "@coral-xyz/react-common";
 import {
@@ -15,12 +15,24 @@ import { useCustomTransactions } from "./useCustomTransactions";
 interface ActivityPageProps {
   address: string;
   blockchain: Blockchain;
+  onRefreshReady?: (refreshFn: () => void) => void;
 }
 
-export function ActivityPage({ address, blockchain }: ActivityPageProps) {
+export function ActivityPage({
+  address,
+  blockchain,
+  onRefreshReady,
+}: ActivityPageProps) {
   const { transactions, loading, hasMore, error, loadMore, refresh } =
     useCustomTransactions(address, blockchain);
   const theme = useTheme();
+
+  // Expose refresh function to parent component
+  useEffect(() => {
+    if (onRefreshReady) {
+      onRefreshReady(refresh);
+    }
+  }, [refresh, onRefreshReady]);
 
   if (loading && transactions.length === 0) {
     return (
@@ -74,9 +86,10 @@ export function ActivityPage({ address, blockchain }: ActivityPageProps) {
           />
         ))}
 
-        {hasMore ? <XStack justifyContent="center" padding="$3">
-          {loading ? (
-            <Loading iconStyle={{ width: 20, height: 20 }} />
+        {hasMore ? (
+          <XStack justifyContent="center" padding="$3">
+            {loading ? (
+              <Loading iconStyle={{ width: 20, height: 20 }} />
             ) : (
               <StyledText
                 fontSize="$sm"
@@ -87,7 +100,8 @@ export function ActivityPage({ address, blockchain }: ActivityPageProps) {
                 Load More
               </StyledText>
             )}
-        </XStack> : null}
+          </XStack>
+        ) : null}
       </YStack>
     </ScrollView>
   );
@@ -132,32 +146,38 @@ function TransactionItem({
           </StyledText>
         </XStack>
 
-        {transaction.amount ? <XStack justifyContent="space-between">
-          <StyledText fontSize="$xs" color="$baseTextMedEmphasis">
-            Amount
-          </StyledText>
-          <StyledText
-            fontSize="$xs"
-            fontWeight="$medium"
-            color={transaction.type === "SEND" ? "$redText" : "$greenText"}
+        {transaction.amount ? (
+          <XStack justifyContent="space-between">
+            <StyledText fontSize="$xs" color="$baseTextMedEmphasis">
+              Amount
+            </StyledText>
+            <StyledText
+              fontSize="$xs"
+              fontWeight="$medium"
+              color={transaction.type === "SEND" ? "$redText" : "$greenText"}
             >
-            {transaction.type === "SEND" ? "-" : "+"}
-            {transaction.amount} {transaction.tokenSymbol || ""}
-          </StyledText>
-        </XStack> : null}
+              {transaction.type === "SEND" ? "-" : "+"}
+              {transaction.amount} {transaction.tokenSymbol || ""}
+            </StyledText>
+          </XStack>
+        ) : null}
 
-        {transaction.fee ? <XStack justifyContent="space-between">
-          <StyledText fontSize="$xs" color="$baseTextMedEmphasis">
-            Fee
-          </StyledText>
-          <StyledText fontSize="$xs" color="$baseTextMedEmphasis">
-            {transaction.fee} {transaction.tokenSymbol || "XNT"}
-          </StyledText>
-        </XStack> : null}
+        {transaction.fee ? (
+          <XStack justifyContent="space-between">
+            <StyledText fontSize="$xs" color="$baseTextMedEmphasis">
+              Fee
+            </StyledText>
+            <StyledText fontSize="$xs" color="$baseTextMedEmphasis">
+              {transaction.fee} {transaction.tokenSymbol || "XNT"}
+            </StyledText>
+          </XStack>
+        ) : null}
 
-        {transaction.error ? <StyledText fontSize="$xs" color="$redText">
-          Error: {transaction.error}
-        </StyledText> : null}
+        {transaction.error ? (
+          <StyledText fontSize="$xs" color="$redText">
+            Error: {transaction.error}
+          </StyledText>
+        ) : null}
       </YStack>
     </XStack>
   );

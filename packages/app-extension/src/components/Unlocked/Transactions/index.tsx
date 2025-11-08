@@ -12,11 +12,19 @@ import { ActivityPage } from "./ActivityPage";
 
 export function Transactions({
   ctx,
+  onRefreshReady,
 }: {
   ctx: { publicKey: string; blockchain: Blockchain };
+  onRefreshReady?: (refreshFn: () => void) => void;
 }) {
   // Use new activity page implementation for all blockchains
-  return <ActivityPage address={ctx.publicKey} blockchain={ctx.blockchain} />;
+  return (
+    <ActivityPage
+      address={ctx.publicKey}
+      blockchain={ctx.blockchain}
+      onRefreshReady={onRefreshReady}
+    />
+  );
 }
 
 export function TransactionsLoader() {

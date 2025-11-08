@@ -1,4 +1,6 @@
+import { useRef } from "react";
 import { useActiveWallet } from "@coral-xyz/recoil";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { Transactions } from "../../../../components/Unlocked/Transactions";
 import { ScreenContainer } from "../../../components/ScreenContainer";
@@ -21,5 +23,22 @@ function Loading() {
 
 function Container() {
   const activeWallet = useActiveWallet();
-  return <Transactions ctx={activeWallet} />;
+  const refreshFnRef = useRef<(() => void) | null>(null);
+
+  // Capture the refresh function from ActivityPage
+  const handleRefreshReady = (refreshFn: () => void) => {
+    refreshFnRef.current = refreshFn;
+  };
+
+  // Trigger refresh when screen comes into focus
+  useFocusEffect(() => {
+    if (refreshFnRef.current) {
+      console.log("🔄 Activity tab focused - refreshing transactions");
+      refreshFnRef.current();
+    }
+  });
+
+  return (
+    <Transactions ctx={activeWallet} onRefreshReady={handleRefreshReady} />
+  );
 }

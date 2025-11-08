@@ -64,7 +64,7 @@ function initializeDatabase() {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           wallet_prefix TEXT NOT NULL,
           wallet_address TEXT NOT NULL,
-          hash TEXT NOT NULL UNIQUE,
+          hash TEXT NOT NULL,
           type TEXT NOT NULL,
           timestamp TEXT NOT NULL,
           amount TEXT,
@@ -77,7 +77,8 @@ function initializeDatabase() {
           source TEXT,
           nfts TEXT,
           provider_id TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(hash, wallet_address)
         )`,
         (err) => {
           if (err) {
@@ -90,26 +91,62 @@ function initializeDatabase() {
           db.run(
             `CREATE INDEX IF NOT EXISTS idx_wallet_prefix ON transactions(wallet_prefix)`,
             (err) => {
-              if (err) console.error("Warning: Error creating wallet_prefix index:", err);
+              if (err)
+                console.error(
+                  "Warning: Error creating wallet_prefix index:",
+                  err
+                );
             }
           );
 
           db.run(
             `CREATE INDEX IF NOT EXISTS idx_timestamp ON transactions(timestamp DESC)`,
             (err) => {
-              if (err) console.error("Warning: Error creating timestamp index:", err);
+              if (err)
+                console.error("Warning: Error creating timestamp index:", err);
             }
           );
 
           db.run(
             `CREATE INDEX IF NOT EXISTS idx_hash ON transactions(hash)`,
             (err) => {
-              if (err) console.error("Warning: Error creating hash index:", err);
+              if (err)
+                console.error("Warning: Error creating hash index:", err);
             }
           );
 
-          console.log("✅ Database initialized");
-          resolve();
+          // Create wallets table for tracking which wallets to index
+          db.run(
+            `CREATE TABLE IF NOT EXISTS wallets (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              address TEXT NOT NULL UNIQUE,
+              network TEXT NOT NULL DEFAULT 'testnet',
+              enabled INTEGER NOT NULL DEFAULT 1,
+              last_indexed TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`,
+            (err) => {
+              if (err) {
+                console.error("❌ Error creating wallets table:", err);
+                reject(err);
+                return;
+              }
+
+              db.run(
+                `CREATE INDEX IF NOT EXISTS idx_wallet_address ON wallets(address)`,
+                (err) => {
+                  if (err)
+                    console.error(
+                      "Warning: Error creating wallet_address index:",
+                      err
+                    );
+                }
+              );
+
+              console.log("✅ Database initialized");
+              resolve();
+            }
+          );
         }
       );
     });
@@ -210,6 +247,86 @@ function getTransactionCount(walletAddress, providerId) {
         reject(err);
       } else {
         resolve(row.count);
+      }
+    });
+  });
+}
+
+// ============================================================================
+// Wallet Registry Functions
+// ============================================================================
+
+// Register a wallet for indexing
+function registerWallet(address, network = "testnet", enabled = true) {
+  return new Promise((resolve, reject) => {
+    const sql = `INSERT OR REPLACE INTO wallets (address, network, enabled)
+      VALUES (?, ?, ?)`;
+
+    db.run(sql, [address, network, enabled ? 1 : 0], function (err) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(this.lastID);
+      }
+    });
+  });
+}
+
+// Get all wallets for indexing
+function getRegisteredWallets() {
+  return new Promise((resolve, reject) => {
+    const sql = `SELECT address, network, enabled, last_indexed
+      FROM wallets
+      ORDER BY created_at DESC`;
+
+    db.all(sql, [], (err, rows) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(
+          rows.map((row) => ({
+            address: row.address,
+            network: row.network,
+            enabled: row.enabled === 1,
+            lastIndexed: row.last_indexed,
+          }))
+        );
+      }
+    });
+  });
+}
+
+// Update last indexed timestamp
+function updateLastIndexed(address) {
+  return new Promise((resolve, reject) => {
+    const sql = `UPDATE wallets SET last_indexed = ? WHERE address = ?`;
+    const timestamp = new Date().toISOString();
+
+    db.run(sql, [timestamp, address], function (err) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+// Auto-register wallet when it queries transactions (if not already registered)
+function autoRegisterWallet(address, providerId) {
+  return new Promise((resolve, reject) => {
+    const network = providerId.toLowerCase().includes("mainnet")
+      ? "mainnet"
+      : "testnet";
+
+    const sql = `INSERT OR IGNORE INTO wallets (address, network, enabled)
+      VALUES (?, ?, 1)`;
+
+    db.run(sql, [address, network], function (err) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
       }
     });
   });
@@ -486,12 +603,17 @@ const server = http.createServer((req, res) => {
         } = requestData;
 
         console.log(`\n📥 Transaction Activity Request:`);
-        console.log(`   Address: ${address} (prefix: ${getWalletPrefix(address)})`);
+        console.log(
+          `   Address: ${address} (prefix: ${getWalletPrefix(address)})`
+        );
         console.log(`   Provider: ${providerId}`);
         console.log(`   Limit: ${limit}, Offset: ${offset}`);
         if (tokenMint) console.log(`   Token Mint: ${tokenMint}`);
 
         const actualLimit = Math.min(limit, 50);
+
+        // Auto-register wallet for indexing
+        await autoRegisterWallet(address, providerId);
 
         // Fetch from database
         const transactions = await getTransactions(
@@ -552,18 +674,26 @@ const server = http.createServer((req, res) => {
         const requestData = JSON.parse(body);
         const { address, providerId, transactions } = requestData;
 
-        if (!address || !providerId || !transactions || !Array.isArray(transactions)) {
+        if (
+          !address ||
+          !providerId ||
+          !transactions ||
+          !Array.isArray(transactions)
+        ) {
           res.writeHead(400);
           res.end(
             JSON.stringify({
               error: "Bad Request",
-              message: "Required fields: address, providerId, transactions (array)",
+              message:
+                "Required fields: address, providerId, transactions (array)",
             })
           );
           return;
         }
 
-        console.log(`\n💾 Storing ${transactions.length} transactions for ${getWalletPrefix(address)}`);
+        console.log(
+          `\n💾 Storing ${transactions.length} transactions for ${getWalletPrefix(address)}`
+        );
 
         const results = [];
         for (const tx of transactions) {
@@ -574,16 +704,24 @@ const server = http.createServer((req, res) => {
             if (err.message.includes("UNIQUE constraint")) {
               results.push({ hash: tx.hash, status: "duplicate" });
             } else {
-              results.push({ hash: tx.hash, status: "error", error: err.message });
+              results.push({
+                hash: tx.hash,
+                status: "error",
+                error: err.message,
+              });
             }
           }
         }
 
         const inserted = results.filter((r) => r.status === "inserted").length;
-        const duplicates = results.filter((r) => r.status === "duplicate").length;
+        const duplicates = results.filter(
+          (r) => r.status === "duplicate"
+        ).length;
         const errors = results.filter((r) => r.status === "error").length;
 
-        console.log(`✅ Stored: ${inserted} inserted, ${duplicates} duplicates, ${errors} errors\n`);
+        console.log(
+          `✅ Stored: ${inserted} inserted, ${duplicates} duplicates, ${errors} errors\n`
+        );
 
         res.writeHead(200);
         res.end(
@@ -597,6 +735,137 @@ const server = http.createServer((req, res) => {
         );
       } catch (error) {
         console.error(`❌ Store transaction error: ${error.message}`);
+        res.writeHead(500);
+        res.end(
+          JSON.stringify({
+            error: "Internal Server Error",
+            message: error.message,
+          })
+        );
+      }
+    });
+    return;
+  }
+
+  // Handle /wallets endpoint to list registered wallets
+  if (pathname === "/wallets" && req.method === "GET") {
+    (async () => {
+      try {
+        const wallets = await getRegisteredWallets();
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify(
+            {
+              success: true,
+              wallets,
+              count: wallets.length,
+            },
+            null,
+            2
+          )
+        );
+      } catch (error) {
+        console.error(`❌ Get wallets error: ${error.message}`);
+        res.writeHead(500);
+        res.end(
+          JSON.stringify({
+            error: "Internal Server Error",
+            message: error.message,
+          })
+        );
+      }
+    })();
+    return;
+  }
+
+  // Handle /wallets/register endpoint to manually register a wallet
+  if (pathname === "/wallets/register" && req.method === "POST") {
+    let body = "";
+
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
+
+    req.on("end", async () => {
+      try {
+        const requestData = JSON.parse(body);
+        const { address, network = "testnet", enabled = true } = requestData;
+
+        if (!address) {
+          res.writeHead(400);
+          res.end(
+            JSON.stringify({
+              error: "Bad Request",
+              message: "Required field: address",
+            })
+          );
+          return;
+        }
+
+        await registerWallet(address, network, enabled);
+
+        console.log(`✅ Registered wallet: ${address} (${network})`);
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify(
+            {
+              success: true,
+              wallet: { address, network, enabled },
+            },
+            null,
+            2
+          )
+        );
+      } catch (error) {
+        console.error(`❌ Register wallet error: ${error.message}`);
+        res.writeHead(500);
+        res.end(
+          JSON.stringify({
+            error: "Internal Server Error",
+            message: error.message,
+          })
+        );
+      }
+    });
+    return;
+  }
+
+  // Handle /wallets/update-indexed endpoint to update last indexed timestamp
+  if (pathname === "/wallets/update-indexed" && req.method === "POST") {
+    let body = "";
+
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
+
+    req.on("end", async () => {
+      try {
+        const requestData = JSON.parse(body);
+        const { address } = requestData;
+
+        if (!address) {
+          res.writeHead(400);
+          res.end(
+            JSON.stringify({
+              error: "Bad Request",
+              message: "Required field: address",
+            })
+          );
+          return;
+        }
+
+        await updateLastIndexed(address);
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            success: true,
+          })
+        );
+      } catch (error) {
+        console.error(`❌ Update last indexed error: ${error.message}`);
         res.writeHead(500);
         res.end(
           JSON.stringify({
@@ -765,7 +1034,15 @@ initializeDatabase()
       console.log(
         `   POST /transactions/store                  - Store transactions to DB`
       );
-      console.log(`   POST /v2/graphql                          - GraphQL queries`);
+      console.log(
+        `   GET  /wallets                             - List registered wallets`
+      );
+      console.log(
+        `   POST /wallets/register                    - Register wallet for indexing`
+      );
+      console.log(
+        `   POST /v2/graphql                          - GraphQL queries`
+      );
       console.log(`   GET  /test                                - Test page`);
       console.log("");
       console.log("Examples:");
