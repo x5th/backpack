@@ -46,12 +46,9 @@ function Container() {
   const activeWallet = useActiveWallet();
   const background = useBackgroundClient();
 
-  // Get connection URLs for both blockchains
-  const x1ConnectionUrl = useRecoilValue(
-    blockchainConnectionUrl(Blockchain.X1)
-  );
-  const solanaConnectionUrl = useRecoilValue(
-    blockchainConnectionUrl(Blockchain.SOLANA)
+  // Get the current RPC URL for the active wallet's blockchain
+  const currentConnectionUrl = useRecoilValue(
+    blockchainConnectionUrl(activeWallet.blockchain)
   );
 
   // Get configs for both X1 and Solana
@@ -74,23 +71,25 @@ function Container() {
       ([, { name, url, chainId }]) => {
         menuItems[name] = {
           onClick: () => {
-            changeNetwork(background, Blockchain.X1, url, chainId);
+            changeNetwork(background, Blockchain.X1, url, chainId, activeWallet.blockchain);
           },
-          detail: x1ConnectionUrl === url ? <Checkmark /> : null,
+          // Show checkmark if this URL matches the current connection
+          detail: currentConnectionUrl === url ? <Checkmark /> : null,
         };
       }
     );
   }
 
-  // Add Solana networks
+  // Add Solana networks (treated as alternative RPCs for X1)
   if (solanaConfig) {
     Object.entries(solanaConfig.RpcConnectionUrls).forEach(
       ([, { name, url, chainId }]) => {
         menuItems[name] = {
           onClick: () => {
-            changeNetwork(background, Blockchain.SOLANA, url, chainId);
+            changeNetwork(background, Blockchain.SOLANA, url, chainId, activeWallet.blockchain);
           },
-          detail: solanaConnectionUrl === url ? <Checkmark /> : null,
+          // Show checkmark if this URL matches the current connection
+          detail: currentConnectionUrl === url ? <Checkmark /> : null,
         };
       }
     );

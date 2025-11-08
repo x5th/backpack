@@ -82,13 +82,15 @@ export const changeNetwork = async (
   background: ChannelAppUiClient,
   blockchain: Blockchain,
   url: string,
-  chainId?: string
+  chainId?: string,
+  activeWalletBlockchain?: Blockchain
 ) => {
   try {
-    // ph101pp todo
+    // Always update the RPC URL for the active wallet's blockchain (X1)
+    // We treat Solana networks as alternative RPC endpoints for X1, not a blockchain switch
     await background.request({
       method: UI_RPC_METHOD_CONNECTION_URL_UPDATE,
-      params: [url, blockchain],
+      params: [url, activeWalletBlockchain || blockchain],
     });
 
     // TODO: this probably shouldn't assume ethers?
@@ -105,6 +107,6 @@ export const changeNetwork = async (
       });
     }
   } catch (err) {
-    console.error(err);
+    console.error("Error changing network:", err);
   }
 };
