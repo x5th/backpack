@@ -94,13 +94,23 @@ function _TokenBalances({
   useEffect(() => {
     const fetchBalances = async () => {
       try {
-        // Determine the correct providerId for X1 blockchain
+        // Determine the correct providerId for X1 and Solana blockchains
         let finalProviderId = providerId;
         if (blockchain === "x1" && connectionUrl) {
           if (connectionUrl.includes("testnet")) {
             finalProviderId = "X1-testnet" as ProviderId;
           } else {
             finalProviderId = "X1-mainnet" as ProviderId;
+          }
+        } else if (blockchain === "solana" && connectionUrl) {
+          if (connectionUrl.includes("mainnet")) {
+            finalProviderId = "SOLANA-mainnet" as ProviderId;
+          } else if (connectionUrl.includes("devnet")) {
+            finalProviderId = "SOLANA-devnet" as ProviderId;
+          } else if (connectionUrl.includes("testnet")) {
+            finalProviderId = "SOLANA-testnet" as ProviderId;
+          } else {
+            finalProviderId = "SOLANA-mainnet" as ProviderId;
           }
         }
 

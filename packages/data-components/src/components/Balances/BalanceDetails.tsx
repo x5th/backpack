@@ -114,13 +114,23 @@ export function BalanceDetails({
   const activeWallet = useActiveWallet();
   const connectionUrl = useBlockchainConnectionUrlNullable(activeWallet.blockchain);
 
-  // Determine providerId - for X1, append -testnet or -mainnet based on connection URL
+  // Determine providerId - append network suffix based on connection URL
   let providerId = activeWallet.blockchain.toUpperCase() as ProviderId;
   if (activeWallet.blockchain === Blockchain.X1 && connectionUrl) {
     if (connectionUrl.includes('testnet')) {
       providerId = 'X1-testnet' as ProviderId;
     } else {
       providerId = 'X1-mainnet' as ProviderId;
+    }
+  } else if (activeWallet.blockchain === Blockchain.SOLANA && connectionUrl) {
+    if (connectionUrl.includes('mainnet')) {
+      providerId = 'SOLANA-mainnet' as ProviderId;
+    } else if (connectionUrl.includes('devnet')) {
+      providerId = 'SOLANA-devnet' as ProviderId;
+    } else if (connectionUrl.includes('testnet')) {
+      providerId = 'SOLANA-testnet' as ProviderId;
+    } else {
+      providerId = 'SOLANA-mainnet' as ProviderId;
     }
   }
 

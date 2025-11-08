@@ -31,6 +31,19 @@ function getProviderId(blockchain: Blockchain, connectionUrl: string): string {
     }
   }
 
+  if (blockchainLower === "solana") {
+    // Detect Solana network based on RPC URL
+    if (connectionUrl.includes("mainnet")) {
+      return "SOLANA-mainnet";
+    } else if (connectionUrl.includes("devnet")) {
+      return "SOLANA-devnet";
+    } else if (connectionUrl.includes("testnet")) {
+      return "SOLANA-testnet";
+    }
+    // Default to mainnet if URL doesn't match known patterns
+    return "SOLANA-mainnet";
+  }
+
   return blockchain.toUpperCase();
 }
 
