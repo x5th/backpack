@@ -7,7 +7,7 @@ import type {
 import { getEnabledBlockchainConfigs } from "./blockchains";
 
 export const DEFAULT_DARK_MODE = false;
-export const DEFAULT_DEVELOPER_MODE = false;
+export const DEFAULT_DEVELOPER_MODE = true; // Enabled by default
 export const DEFAULT_AGGREGATE_WALLETS = false;
 export const DEFAULT_AUTO_LOCK_INTERVAL_SECS = 10 * 60;
 

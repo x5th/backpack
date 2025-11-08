@@ -33,7 +33,7 @@ export function TransactionSettings({
 }: TransactionSettingsProps) {
   const { t } = useTranslation();
   const user = useRecoilValue(secureUserAtom);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(true); // Always open by default
 
   const maxPriorityFeeSol = useMemo(() => {
     const unitLimit = parseFloat(overrides.computeUnits);
@@ -46,26 +46,25 @@ export function TransactionSettings({
   // Determine the native token symbol based on blockchain
   const nativeSymbol = blockchain === Blockchain.X1 ? "XNT" : "SOL";
 
-  if (!user.preferences.developerMode) {
-    return null;
-  }
-
+  // Always show max priority fee, but advanced settings only in dev mode
   return (
     <YStack key="fees" space="$2">
-      <Pressable onPress={() => setShowSettings((prev) => !prev)}>
-        <XStack f={1} ai="center" jc="space-between" cursor="pointer">
-          <StyledText fontWeight="$bold" color="$baseTextHighEmphasis">
-            {t("transaction_settings")}
-          </StyledText>
-          <XStack cursor="pointer" pointerEvents="box-only">
-            <ChevronDownIcon
-              color="$baseTextMedEmphasis"
-              fontSize="$sm"
-              transform={showSettings ? [{ rotateZ: "180deg" }] : undefined}
-            />
+      {user.preferences.developerMode && (
+        <Pressable onPress={() => setShowSettings((prev) => !prev)}>
+          <XStack f={1} ai="center" jc="space-between" cursor="pointer">
+            <StyledText fontWeight="$bold" color="$baseTextHighEmphasis">
+              {t("transaction_settings")}
+            </StyledText>
+            <XStack cursor="pointer" pointerEvents="box-only">
+              <ChevronDownIcon
+                color="$baseTextMedEmphasis"
+                fontSize="$sm"
+                transform={showSettings ? [{ rotateZ: "180deg" }] : undefined}
+              />
+            </XStack>
           </XStack>
-        </XStack>
-      </Pressable>
+        </Pressable>
+      )}
       {showSettings ? (
         <YStack space="$2">
           {/* <XStack f={1} ai="center" jc="space-between" key="downgradAccounts">
