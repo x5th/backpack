@@ -1,5 +1,8 @@
 import type { Blockchain } from "@coral-xyz/common";
-import { hiddenTokenAddresses, useBlockchainConnectionUrl } from "@coral-xyz/recoil";
+import {
+  hiddenTokenAddresses,
+  useBlockchainConnectionUrl,
+} from "@coral-xyz/recoil";
 import { YStack } from "@coral-xyz/tamagui";
 import {
   type ReactElement,
@@ -93,11 +96,11 @@ function _TokenBalances({
       try {
         // Determine the correct providerId for X1 blockchain
         let finalProviderId = providerId;
-        if (blockchain === 'x1' && connectionUrl) {
-          if (connectionUrl.includes('testnet')) {
-            finalProviderId = 'X1-testnet' as ProviderId;
+        if (blockchain === "x1" && connectionUrl) {
+          if (connectionUrl.includes("testnet")) {
+            finalProviderId = "X1-testnet" as ProviderId;
           } else {
-            finalProviderId = 'X1-mainnet' as ProviderId;
+            finalProviderId = "X1-mainnet" as ProviderId;
           }
         }
 
@@ -126,7 +129,8 @@ function _TokenBalances({
             id: token.symbol.toLowerCase(),
             address: token.mint,
             decimals: token.decimals,
-            logo: token.logo,
+            // Use local x1.png for XNT token, otherwise use server logo
+            logo: token.symbol === "XNT" ? "x1.png" : token.logo,
             name: token.name,
             symbol: token.symbol,
           },
