@@ -7,9 +7,9 @@ import {
   blockchainClientAtom,
   useActiveWallet,
   useAnchorContext,
+  useBlockchainConnectionUrl,
   useEthereumCtx,
   useIsValidAddress,
-  useBlockchainConnectionUrl,
 } from "@coral-xyz/recoil";
 import {
   BpDangerButton,
@@ -28,10 +28,6 @@ import {
   MaxAmountButton,
 } from "../../../../components/Unlocked/Balances/TokensWidget/Send";
 import { ScreenContainer } from "../../../components/ScreenContainer";
-import {
-  ConfirmationErrorDrawer,
-  withTransactionCancelBypass,
-} from "../../../components/TransactionConfirmation";
 import {
   Routes,
   type SendAmountSelectScreenProps,
@@ -79,10 +75,10 @@ function _Send({
         // Determine the correct providerId for X1 blockchain
         let providerId = blockchain.toUpperCase();
         if (blockchain === Blockchain.X1 && connectionUrl) {
-          if (connectionUrl.includes('testnet')) {
-            providerId = 'X1-testnet';
+          if (connectionUrl.includes("testnet")) {
+            providerId = "X1-testnet";
           } else {
-            providerId = 'X1-mainnet';
+            providerId = "X1-mainnet";
           }
         }
 
@@ -186,8 +182,6 @@ function _SendInner({
   const [amount, setAmount] = useState<BigNumber | null>(null);
   const [strAmount, setStrAmount] = useState("");
   const [feeOffset, setFeeOffset] = useState(BigNumber.from(0));
-  const [error, setError] = useState<string | undefined>(undefined);
-  const [openDrawer, setOpenDrawer] = useState(false);
   const nftId = token.id;
 
   useEffect(() => {
@@ -247,56 +241,35 @@ function _SendInner({
       return;
     }
 
-    try {
-      await withTransactionCancelBypass(async () => {
-        const txSignature = await blockchainClient.transferAsset({
-          // Amount must be blockchain *native* units--*not* UI units.
-          amount: amount.toString(),
-          assetId: nftId,
-          from: { publicKey: active.publicKey },
-          to: { ...to, publicKey: to.address },
-        });
-
-        const amtVal = Number(strAmount.replaceAll(",", ""));
-        navigation.push(Routes.SendConfirmationScreen, {
-          amount: amtVal >= 1_000 ? amtVal.toLocaleString() : amtVal.toString(),
-          signature: txSignature,
-          tokenId: token.id,
-        });
-      });
-    } catch (err: any) {
-      setError(err.message);
-      setOpenDrawer(true);
-    }
+    // Navigate to review screen instead of sending immediately
+    navigation.push(Routes.SendReviewScreen, {
+      assetId: nftId,
+      amount,
+      strAmount,
+      tokenSymbol: token.tokenListEntry?.symbol || "UNKNOWN",
+      to,
+    });
   };
 
   return (
-    <>
-      <form
-        noValidate
-        className={classes.container}
-        onSubmit={(e) => {
+    <form
+      noValidate
+      className={classes.container}
+      onSubmit={(e) => {
           e.preventDefault();
           onPressNext();
         }}
       >
-        <SendV2
-          to={to}
-          sendButton={sendButton}
-          strAmount={strAmount}
-          token={token}
-          maxAmount={maxAmount}
-          setAmount={setAmount}
-          setStrAmount={setStrAmount}
+      <SendV2
+        to={to}
+        sendButton={sendButton}
+        strAmount={strAmount}
+        token={token}
+        maxAmount={maxAmount}
+        setAmount={setAmount}
+        setStrAmount={setStrAmount}
         />
-      </form>
-      <ConfirmationErrorDrawer
-        error={error}
-        open={openDrawer}
-        resetError={() => setError(undefined)}
-        setOpen={setOpenDrawer}
-      />
-    </>
+    </form>
   );
 }
 
@@ -341,9 +314,10 @@ function SendV2({
   const { blockchain } = useActiveWallet();
 
   // Use X1 blockchain logo when on X1 network
-  const tokenLogo = blockchain === Blockchain.X1
-    ? "./x1.png"
-    : (token.tokenListEntry?.logo ?? UNKNOWN_ICON_SRC);
+  const tokenLogo =
+    blockchain === Blockchain.X1
+      ? "./x1.png"
+      : token.tokenListEntry?.logo ?? UNKNOWN_ICON_SRC;
 
   return (
     <>

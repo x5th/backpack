@@ -6,6 +6,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { SendAddressSelectScreen } from "../screens/Unlocked/Send/SendAddressSelectScreen";
 import { SendAmountSelectScreen } from "../screens/Unlocked/Send/SendAmountSelectScreen";
 import { SendConfirmationScreen } from "../screens/Unlocked/Send/SendConfirmationScreen";
+import { SendReviewScreen } from "../screens/Unlocked/Send/SendReviewScreen";
 import { SendTokenSelectScreen } from "../screens/Unlocked/Send/SendTokenSelectScreen";
 
 import { headerStyles, maybeCloseButton } from "./utils";
@@ -15,6 +16,7 @@ export enum Routes {
   SendTokenSelectScreen = "SendTokenSelectScreen",
   SendAddressSelectScreen = "SendAddressSelectScreen",
   SendAmountSelectScreen = "SendAmountSelectScreen",
+  SendReviewScreen = "SendReviewScreen",
   SendConfirmationScreen = "SendConfirmationScreen",
 }
 
@@ -27,6 +29,19 @@ type SendScreenStackNavigatorParamList = {
   [Routes.SendAmountSelectScreen]: {
     assetId: string;
     blockchain: Blockchain;
+    to: {
+      address: string;
+      username?: string;
+      walletName?: string;
+      image?: string;
+      uuid?: string;
+    };
+  };
+  [Routes.SendReviewScreen]: {
+    assetId: string;
+    amount: any; // BigNumber
+    strAmount: string;
+    tokenSymbol: string;
     to: {
       address: string;
       username?: string;
@@ -55,6 +70,11 @@ export type SendAddressSelectScreenProps = StackScreenProps<
 export type SendAmountSelectScreenProps = StackScreenProps<
   SendScreenStackNavigatorParamList,
   Routes.SendAmountSelectScreen
+>;
+
+export type SendReviewScreenProps = StackScreenProps<
+  SendScreenStackNavigatorParamList,
+  Routes.SendReviewScreen
 >;
 
 export type SendConfirmationScreenProps = StackScreenProps<
@@ -121,6 +141,16 @@ export function SendNavigator({
               navigation,
               "pop-root-twice"
             ),
+          };
+        }}
+      />
+      <Stack.Screen
+        name={Routes.SendReviewScreen}
+        component={SendReviewScreen}
+        options={({ navigation }) => {
+          return {
+            title: t("review"),
+            ...maybeCloseButton(false, navigation, "pop-root-twice"),
           };
         }}
       />

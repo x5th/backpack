@@ -1,5 +1,10 @@
-import { useCallback, useEffect, useRef,useState } from "react";
-import { BACKEND_API_URL, type Blockchain } from "@coral-xyz/common";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { type Blockchain } from "@coral-xyz/common";
+import {
+  backendApiUrl,
+  blockchainConnectionUrl,
+} from "@coral-xyz/recoil/src/atoms/preferences";
+import { useRecoilValue } from "recoil";
 
 export interface Transaction {
   hash: string;
@@ -14,11 +19,16 @@ export interface Transaction {
   error?: string | null;
 }
 
-function getProviderId(blockchain: Blockchain): string {
+function getProviderId(blockchain: Blockchain, connectionUrl: string): string {
   const blockchainLower = blockchain.toLowerCase();
 
   if (blockchainLower === "x1") {
-    return "X1-testnet";
+    // Detect if connected to mainnet or testnet based on RPC URL
+    if (connectionUrl.includes("mainnet")) {
+      return "X1-mainnet";
+    } else {
+      return "X1-testnet";
+    }
   }
 
   return blockchain.toUpperCase();
@@ -30,6 +40,8 @@ export function useCustomTransactions(address: string, blockchain: Blockchain) {
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const offsetRef = useRef(0);
+  const apiUrl = useRecoilValue(backendApiUrl);
+  const connectionUrl = useRecoilValue(blockchainConnectionUrl(blockchain));
 
   const fetchTransactions = useCallback(
     async (loadMore = false) => {
@@ -38,8 +50,8 @@ export function useCustomTransactions(address: string, blockchain: Blockchain) {
           setLoading(true);
         }
 
-        const providerId = getProviderId(blockchain);
-        const url = `${BACKEND_API_URL}/transactions`;
+        const providerId = getProviderId(blockchain, connectionUrl);
+        const url = `${apiUrl}/transactions`;
 
         console.log("🌐 [CustomTransactionHook] Fetching from:", url, {
           address,
@@ -94,7 +106,7 @@ export function useCustomTransactions(address: string, blockchain: Blockchain) {
         setLoading(false);
       }
     },
-    [address, blockchain]
+    [address, blockchain, apiUrl, connectionUrl]
   );
 
   useEffect(() => {

@@ -50,6 +50,17 @@ export const isDeveloperMode = selector<boolean>({
   },
 });
 
+export const backendApiUrl = selector<string>({
+  key: "backendApiUrl",
+  get: async ({ get }) => {
+    const { BACKEND_API_URL_DEV, BACKEND_API_URL_PROD } = await import(
+      "@coral-xyz/common"
+    );
+    const devMode = get(isDeveloperMode);
+    return devMode ? BACKEND_API_URL_DEV : BACKEND_API_URL_PROD;
+  },
+});
+
 export const autoLockSettings = selector<AutolockSettings>({
   key: "autoLockSettings",
   get: async ({ get }) => {

@@ -5,6 +5,7 @@ import { userClientAtom } from "@coral-xyz/recoil";
 import { useTheme } from "@coral-xyz/tamagui";
 import {
   AccountCircleOutlined,
+  Language,
   Lock,
   Search,
   Settings,
@@ -106,6 +107,12 @@ function SettingsList() {
     icon: (props: any) => React.ReactNode;
     detailIcon: React.ReactNode;
   }[] = [
+    {
+      label: t("network"),
+      onClick: () => navigation.push(Routes.NetworkSelectScreen),
+      icon: (props) => <Language {...props} />,
+      detailIcon: <PushDetail />,
+    },
     {
       label: t("your_account"),
       onClick: () => navigation.push(Routes.YourAccountScreen),

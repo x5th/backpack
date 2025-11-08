@@ -27,10 +27,12 @@ export async function fetchTransactionsFromServer(
   providerId: ProviderId,
   limit: number = 50,
   offset: number = 0,
-  tokenMint?: string
+  tokenMint?: string,
+  backendUrl?: string
 ): Promise<TransactionResponse> {
   try {
-    const url = `${BACKEND_API_URL}/transactions`;
+    const apiUrl = backendUrl || BACKEND_API_URL;
+    const url = `${apiUrl}/transactions`;
     console.log("🌐 [TransactionHistory] Fetching from:", url);
 
     const requestBody = {

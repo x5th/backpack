@@ -62,7 +62,7 @@ export function ConfirmationIcon({
       width={80}
       height={80}
       borderRadius={40}
-      backgroundColor="rgba(0, 255, 255, 0.05)"
+      backgroundColor="rgba(59, 130, 246, 0.05)"
     >
       <Loading />
     </YStack>
@@ -116,7 +116,7 @@ export function ConfirmationTokenAmountHeader({
         ai="center"
         jc="center"
         style={{
-          filter: "drop-shadow(0 4px 12px rgba(0, 255, 255, 0.2))",
+          filter: "drop-shadow(0 4px 12px rgba(59, 130, 246, 0.2))",
         }}
       >
         {icon}
@@ -126,7 +126,7 @@ export function ConfirmationTokenAmountHeader({
           fontSize={36}
           fontWeight="$bold"
           style={{
-            background: "linear-gradient(135deg, #0ff, #00a8cc)",
+            background: "linear-gradient(135deg, #3b82f6, #2563eb)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -225,7 +225,7 @@ function _ConfirmationViewTransaction({
   return (
     <XStack
       ai="center"
-      backgroundColor="rgba(0, 255, 255, 0.1)"
+      backgroundColor="rgba(59, 130, 246, 0.1)"
       borderRadius={12}
       cursor="pointer"
       gap={6}
@@ -234,17 +234,17 @@ function _ConfirmationViewTransaction({
       paddingVertical={12}
       pointerEvents="box-only"
       hoverStyle={{
-        backgroundColor: "rgba(0, 255, 255, 0.15)",
+        backgroundColor: "rgba(59, 130, 246, 0.15)",
       }}
       style={{
-        border: "1px solid rgba(0, 255, 255, 0.3)",
+        border: "1px solid rgba(59, 130, 246, 0.3)",
         transition: "all 0.2s ease",
       }}
     >
-      <StyledText color="#0ff" fontWeight="$semiBold">
+      <StyledText color="#3b82f6" fontWeight="$semiBold">
         {t("view_transaction")}
       </StyledText>
-      <ArrowUpRightIcon color="#0ff" strokeWidth={2.5} size={18} />
+      <ArrowUpRightIcon color="#3b82f6" strokeWidth={2.5} size={18} />
     </XStack>
   );
 }

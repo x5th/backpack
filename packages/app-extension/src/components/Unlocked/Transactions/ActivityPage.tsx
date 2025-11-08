@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { Blockchain } from "@coral-xyz/common";
 import { Loading } from "@coral-xyz/react-common";
+import { blockchainConnectionUrl } from "@coral-xyz/recoil/src/atoms/preferences";
 import {
   ScrollView,
   StyledText,
@@ -8,6 +9,7 @@ import {
   XStack,
   YStack,
 } from "@coral-xyz/tamagui";
+import { useRecoilValue } from "recoil";
 
 import type { Transaction } from "./useCustomTransactions";
 import { useCustomTransactions } from "./useCustomTransactions";
@@ -26,6 +28,7 @@ export function ActivityPage({
   const { transactions, loading, hasMore, error, loadMore, refresh } =
     useCustomTransactions(address, blockchain);
   const theme = useTheme();
+  const connectionUrl = useRecoilValue(blockchainConnectionUrl(blockchain));
 
   // Expose refresh function to parent component
   useEffect(() => {
@@ -83,6 +86,7 @@ export function ActivityPage({
             key={tx.hash || index}
             transaction={tx}
             blockchain={blockchain}
+            connectionUrl={connectionUrl}
           />
         ))}
 
@@ -110,14 +114,20 @@ export function ActivityPage({
 function TransactionItem({
   transaction,
   blockchain,
+  connectionUrl,
 }: {
   transaction: Transaction;
   blockchain: Blockchain;
+  connectionUrl: string;
 }) {
   const theme = useTheme();
 
   const handleClick = () => {
-    const explorerUrl = getExplorerUrl(transaction.hash, blockchain);
+    const explorerUrl = getExplorerUrl(
+      transaction.hash,
+      blockchain,
+      connectionUrl
+    );
     window.open(explorerUrl, "_blank");
   };
 
@@ -225,9 +235,18 @@ function formatTimestamp(timestamp: string): string {
   }
 }
 
-function getExplorerUrl(hash: string, blockchain: Blockchain): string {
+function getExplorerUrl(
+  hash: string,
+  blockchain: Blockchain,
+  connectionUrl: string
+): string {
   if (blockchain.toLowerCase() === "x1") {
-    return `https://explorer.testnet.x1.xyz/tx/${hash}`;
+    // Detect mainnet or testnet based on connection URL
+    if (connectionUrl.includes("mainnet")) {
+      return `https://explorer.mainnet.x1.xyz/tx/${hash}`;
+    } else {
+      return `https://explorer.testnet.x1.xyz/tx/${hash}`;
+    }
   }
   return `https://explorer.solana.com/tx/${hash}`;
 }

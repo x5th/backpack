@@ -6,6 +6,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { WalletSettingsButton } from "../../components/common/WalletList";
 import { WalletRemoveConfirmationScreen } from "../../components/Unlocked/Settings/YourAccount/EditWallets/RemoveWalletConfirmationScreen";
 import { AboutScreen } from "../screens/Unlocked/Settings/AboutScreen";
+import { NetworkSelectScreen } from "../screens/Unlocked/Settings/NetworkSelectScreen";
 import { PreferencesAutolockScreen } from "../screens/Unlocked/Settings/PreferencesAutolockScreen";
 import { PreferencesBlockchainCommitmentScreen } from "../screens/Unlocked/Settings/PreferencesBlockchainCommitmentScreen";
 import { PreferencesBlockchainExplorerScreen } from "../screens/Unlocked/Settings/PreferencesBlockchainExplorerScreen";
@@ -42,6 +43,7 @@ import type { SettingsNavigatorProps } from "./WalletsNavigator";
 
 export enum Routes {
   SettingsScreen = "SettingsScreen",
+  NetworkSelectScreen = "NetworkSelectScreen",
 
   WalletsScreen = "WalletsScreen",
   WalletDetailScreen = "WalletDetailScreen",
@@ -81,6 +83,7 @@ export enum Routes {
 
 type SettingsScreenStackNavigatorParamList = {
   [Routes.SettingsScreen]: undefined;
+  [Routes.NetworkSelectScreen]: undefined;
 
   [Routes.WalletsScreen]: undefined;
   [Routes.WalletDetailScreen]: {
@@ -162,7 +165,7 @@ type SettingsScreenStackNavigatorParamList = {
 };
 
 export type SettingsScreenProps<
-  T extends keyof SettingsScreenStackNavigatorParamList
+  T extends keyof SettingsScreenStackNavigatorParamList,
 > = StackScreenProps<SettingsScreenStackNavigatorParamList, T>;
 
 const Stack = createStackNavigator<SettingsScreenStackNavigatorParamList>();
@@ -194,6 +197,16 @@ export function SettingsNavigator({
               navigation,
               "go-back"
             ),
+          };
+        }}
+      />
+      <Stack.Screen
+        name={Routes.NetworkSelectScreen}
+        component={NetworkSelectScreen}
+        options={({ navigation }) => {
+          return {
+            title: t("network"),
+            ...maybeCloseButton(false, navigation),
           };
         }}
       />

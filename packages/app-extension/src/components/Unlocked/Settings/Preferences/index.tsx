@@ -77,24 +77,6 @@ export function Preferences() {
     [t("trusted_sites")]: {
       onClick: () => navigation.push(Routes.PreferencesTrustedSitesScreen),
     },
-    "RPC Connection": {
-      onClick: () =>
-        navigation.push(Routes.PreferencesBlockchainRpcConnectionScreen, {
-          blockchain,
-        }),
-    },
-    "Confirmation Commitment": {
-      onClick: () =>
-        navigation.push(Routes.PreferencesBlockchainCommitmentScreen, {
-          blockchain,
-        }),
-    },
-    "Explorer": {
-      onClick: () =>
-        navigation.push(Routes.PreferencesBlockchainExplorerScreen, {
-          blockchain,
-        }),
-    },
     [t("language")]: {
       onClick: () => navigation.push(Routes.PreferencesLanguageScreen),
     },
@@ -110,6 +92,28 @@ export function Preferences() {
     [t("hidden_tokens")]: {
       onClick: () => navigation.push(Routes.PreferencesHiddenTokensScreen),
     },
+  };
+
+  // Add blockchain-specific settings
+  menuItems["RPC Connection"] = {
+    onClick: () =>
+      navigation.push(Routes.PreferencesBlockchainRpcConnectionScreen, {
+        blockchain,
+      }),
+  };
+
+  menuItems["Confirmation Commitment"] = {
+    onClick: () =>
+      navigation.push(Routes.PreferencesBlockchainCommitmentScreen, {
+        blockchain,
+      }),
+  };
+
+  menuItems["Explorer"] = {
+    onClick: () =>
+      navigation.push(Routes.PreferencesBlockchainExplorerScreen, {
+        blockchain,
+      }),
   };
 
   // if (BACKPACK_FEATURE_LIGHT_MODE) {

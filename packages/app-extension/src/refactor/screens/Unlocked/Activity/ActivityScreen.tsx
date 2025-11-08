@@ -6,6 +6,7 @@ import { Transactions } from "../../../../components/Unlocked/Transactions";
 import { ScreenContainer } from "../../../components/ScreenContainer";
 import { useMountOnFocusWallet } from "../../../hooks/useMountOnFocus";
 import type { ActivityScreenProps } from "../../../navigation/TabsNavigator";
+import { setActivityRefreshFn } from "../../../navigation/TabsNavigator";
 
 export function ActivityScreen(_props: ActivityScreenProps) {
   return useMountOnFocusWallet(
@@ -28,6 +29,8 @@ function Container() {
   // Capture the refresh function from ActivityPage
   const handleRefreshReady = (refreshFn: () => void) => {
     refreshFnRef.current = refreshFn;
+    // Also register it globally for the tab bar icon
+    setActivityRefreshFn(refreshFn);
   };
 
   // Trigger refresh when screen comes into focus

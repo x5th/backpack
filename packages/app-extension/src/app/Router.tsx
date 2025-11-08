@@ -8,6 +8,10 @@ import {
 } from "@coral-xyz/common";
 import { useActiveWallet, useBackgroundClient } from "@coral-xyz/recoil";
 import {
+  blockchainConnectionUrl,
+  isDeveloperMode,
+} from "@coral-xyz/recoil/src/atoms/preferences";
+import {
   AlertTriangleIcon,
   StyledText,
   temporarilyMakeStylesForBrowserExtension,
@@ -15,7 +19,6 @@ import {
   XStack,
 } from "@coral-xyz/tamagui";
 import { useRecoilValue } from "recoil";
-import { blockchainConnectionUrl } from "@coral-xyz/recoil/src/atoms/preferences";
 
 import { Unlocked } from "../components/Unlocked";
 import { refreshFeatureGates } from "../gates/FEATURES";
@@ -39,26 +42,36 @@ export default function Router() {
 function TestnetBanner() {
   const { blockchain } = useActiveWallet();
   const connectionUrl = useRecoilValue(blockchainConnectionUrl(blockchain));
+  const developerMode = useRecoilValue(isDeveloperMode);
 
-  // Only show banner for X1 Testnet
+  // Check if on X1 testnet
   const isX1Testnet =
     blockchain === Blockchain.X1 &&
     connectionUrl === "https://rpc.testnet.x1.xyz";
 
+  // Show banner if on testnet (always) OR if developer mode is on for mainnet
+  const showBanner =
+    isX1Testnet || (developerMode && blockchain === Blockchain.X1);
+
   // Log network status for debugging
   console.log(
-    `[X1 Network ext:0.10.61] Blockchain: ${blockchain}, URL: ${connectionUrl}, IsTestnet: ${isX1Testnet}`
+    `[X1 Network ext:0.10.61] Blockchain: ${blockchain}, URL: ${connectionUrl}, IsTestnet: ${isX1Testnet}, DevMode: ${developerMode}`
   );
 
-  if (!isX1Testnet) {
+  if (!showBanner) {
     return null;
   }
 
+  // Determine banner text
+  const bannerText = isX1Testnet
+    ? developerMode
+      ? "X1 TESTNET DEVELOPER MODE"
+      : "X1 TESTNET"
+    : "DEVELOPER MODE";
+
   return (
     <XStack
-      position="absolute"
       width="100%"
-      top="0px"
       backgroundColor="rgba(255, 152, 0, 0.15)"
       gap="4px"
       paddingVertical="2px"
@@ -70,7 +83,7 @@ function TestnetBanner() {
     >
       <AlertTriangleIcon color="rgb(255, 152, 0)" size={12} />
       <StyledText fontSize={10} fontWeight="600" color="rgb(255, 152, 0)">
-        X1 TESTNET
+        {bannerText}
       </StyledText>
     </XStack>
   );

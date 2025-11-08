@@ -75,6 +75,13 @@ export function TabsNavigator({
   );
 }
 
+// Global ref to store refresh function
+let globalRefreshFn: (() => void) | null = null;
+
+export function setActivityRefreshFn(fn: () => void) {
+  globalRefreshFn = fn;
+}
+
 function TopTabBar({ state, descriptors, navigation, position: _ }: any) {
   return (
     <XStack
@@ -98,6 +105,7 @@ function TopTabBar({ state, descriptors, navigation, position: _ }: any) {
               : route.name;
 
         const isFocused = state.index === index;
+        const isActivityTab = route.name === Routes.ActivityScreen;
 
         const onClick = () => {
           const event = navigation.emit({
@@ -106,13 +114,23 @@ function TopTabBar({ state, descriptors, navigation, position: _ }: any) {
             canPreventDefault: true,
           });
 
+          // If already on Activity tab, trigger refresh
+          if (isFocused && isActivityTab && globalRefreshFn) {
+            globalRefreshFn();
+            return;
+          }
+
           if (!isFocused && !event.defaultPrevented) {
             navigation.navigate(route.name, route.params);
           }
         };
 
         return (
-          <TopTabButton isSelected={isFocused} onClick={onClick}>
+          <TopTabButton
+            key={route.key}
+            isSelected={isFocused}
+            onClick={onClick}
+          >
             {label}
           </TopTabButton>
         );
