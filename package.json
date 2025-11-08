@@ -60,6 +60,8 @@
   },
   "resolutions": {
     "@expo/config-plugins": "~7.8.0",
+    "@ledgerhq/hw-transport": "6.31.3",
+    "@ledgerhq/logs": "6.12.0",
     "@saberhq/token-utils": "npm:@coral-xyz/token-utils@1.15.0-beta.0",
     "@solana/buffer-layout": "^4.0.1",
     "@solana/web3.js": "1.63.1",

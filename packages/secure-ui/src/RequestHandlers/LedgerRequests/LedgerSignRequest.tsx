@@ -1,9 +1,5 @@
-import type { QueuedUiRequest } from "../../_atoms/requestAtoms";
-import type { SECURE_LEDGER_EVENTS } from "@coral-xyz/secure-clients/types";
-
-import { useCallback, useEffect, useState } from "react";
-
 import { openLedgerPermissions } from "@coral-xyz/common";
+import type { SECURE_LEDGER_EVENTS } from "@coral-xyz/secure-clients/types";
 import {
   Loader,
   StyledText,
@@ -13,12 +9,15 @@ import {
 } from "@coral-xyz/tamagui";
 import Ethereum from "@ledgerhq/hw-app-eth";
 import Solana from "@ledgerhq/hw-app-solana";
+import type Transport from "@ledgerhq/hw-transport";
 import TransportWebHid from "@ledgerhq/hw-transport-webhid";
 import { decode, encode } from "bs58";
 import { Signature, Transaction } from "ethers6";
+import { useCallback, useEffect, useState } from "react";
 
 import { executeLedgerFunction } from "./_utils/executeLedgerFunction";
 import { RequireUserUnlocked } from "../../RequireUserUnlocked/RequireUserUnlocked";
+import type { QueuedUiRequest } from "../../_atoms/requestAtoms";
 import { RequestConfirmation } from "../../_sharedComponents/RequestConfirmation";
 
 type RequestHandlers<Events extends SECURE_LEDGER_EVENTS> = {
@@ -59,6 +58,7 @@ function ApproveOnLedger({
   );
   const isPermissionsError = error === "HID_PERMISSIONS_NOT_AVAILABLE";
   const isGestureRequiredError = error === "HID_GESTURE_REQUIRED";
+  const isLedgerLiveConflict = error?.includes("LEDGER_LIVE_CONFLICT");
   const execute = useCallback(() => {
     (async function () {
       const handlers: RequestHandlers<LedgerSignEvents> = {
@@ -73,10 +73,17 @@ function ApproveOnLedger({
       await handler?.(currentRequest as any, setStatus).catch((e) => {
         if (e.message === "HID_PERMISSIONS_NOT_AVAILABLE") {
           setError(e.message);
-          setStatus("Missing HID browser permissions.");
+          setStatus(
+            "Missing HID browser permissions. Click 'Grant Ledger Permissions' to allow access."
+          );
         } else if (e.message === "HID_GESTURE_REQUIRED") {
           setError(e.message);
-          setStatus("Ledger Connection lost.");
+          setStatus("Ledger connection lost. Please reconnect your device.");
+        } else if (e.message?.includes("LEDGER_LIVE_CONFLICT")) {
+          setError(e.message);
+          setStatus(
+            "Ledger Live is running. Please close Ledger Live and try again."
+          );
         } else {
           setStatus(e.message);
           setError(e.message);
@@ -98,7 +105,7 @@ function ApproveOnLedger({
           openLedgerPermissions();
           window.close();
         }
-        if (isGestureRequiredError) {
+        if (isGestureRequiredError || isLedgerLiveConflict) {
           setError(null);
           execute();
         }
@@ -107,8 +114,10 @@ function ApproveOnLedger({
         isPermissionsError
           ? "Grant Ledger Permissions"
           : isGestureRequiredError
-            ? "Try again!"
-            : null
+            ? "Try Again"
+            : isLedgerLiveConflict
+              ? "Retry Connection"
+              : null
       }
       onDeny={() => currentRequest.error(new Error("Cancelled by User"))}
       buttonDirection="column-reverse"
@@ -151,8 +160,8 @@ async function svmSignTx(
   // try executing ledger function
   const [result, cancel] = executeLedgerFunction(
     () => TransportWebHid.create(),
-    (transport) => () => {
-      const solana = new Solana(transport as any);
+    (transport: Transport) => () => {
+      const solana = new Solana(transport);
       return solana.signTransaction(
         currentRequest.request.derivationPath,
         Buffer.from(decode(currentRequest.request.txMessage))
@@ -160,11 +169,11 @@ async function svmSignTx(
     },
     (step) => {
       const status = [
-        "Connect your Ledger device",
-        "Unlock your Ledger device",
-        "Open the Solana App on your Ledger device.",
-        "Approve Transaction on your Ledger device.",
-        "Enable Blind Signature",
+        "Connect your Ledger device via USB",
+        "Unlock your Ledger device with your PIN",
+        "Open the Solana App on your Ledger device",
+        "Review and approve the transaction on your Ledger device",
+        "Enable Blind Signing: On your Ledger, go to Solana App Settings → Allow Blind Sign → Yes",
       ];
       setStatus(status[step]);
     }
@@ -190,8 +199,8 @@ async function svmSignMessage(
   // try executing ledger function
   const [result, cancel] = executeLedgerFunction(
     () => TransportWebHid.create(),
-    (transport) => () => {
-      const solana = new Solana(transport as any);
+    (transport: Transport) => () => {
+      const solana = new Solana(transport);
       return solana.signOffchainMessage(
         currentRequest.request.derivationPath,
         Buffer.from(decode(currentRequest.request.message))
@@ -199,11 +208,11 @@ async function svmSignMessage(
     },
     (step) => {
       const status = [
-        "Connect your Ledger device",
-        "Unlock your Ledger device",
-        "Open the Solana App on your Ledger device.",
-        "Approve Signature on your Ledger device.",
-        "Enable Blind Signature",
+        "Connect your Ledger device via USB",
+        "Unlock your Ledger device with your PIN",
+        "Open the Solana App on your Ledger device",
+        "Review and approve the message signature on your Ledger device",
+        "Enable Blind Signing: On your Ledger, go to Solana App Settings → Allow Blind Sign → Yes",
       ];
       setStatus(status[step]);
     }
@@ -229,8 +238,8 @@ async function evmSignTx(
   // try executing ledger function
   const [result, cancel] = executeLedgerFunction(
     () => TransportWebHid.create(),
-    (transport) => () => {
-      const ethereum = new Ethereum(transport as any);
+    (transport: Transport) => () => {
+      const ethereum = new Ethereum(transport);
       return ethereum.signTransaction(
         currentRequest.request.derivationPath,
         currentRequest.request.txHex.substring(2)
@@ -238,11 +247,11 @@ async function evmSignTx(
     },
     (step) => {
       const status = [
-        "Connect your Ledger device",
-        "Unlock your Ledger device",
-        "Open the Ethereum App on your Ledger device.",
-        "Approve Transaction on your Ledger device.",
-        "Enable Blind Signature",
+        "Connect your Ledger device via USB",
+        "Unlock your Ledger device with your PIN",
+        "Open the Ethereum App on your Ledger device",
+        "Review and approve the transaction on your Ledger device",
+        "Enable Blind Signing: On your Ledger, go to Ethereum App Settings → Allow Blind Sign → Yes",
       ];
       setStatus(status[step]);
     }
@@ -273,8 +282,8 @@ async function evmSignMessage(
   // try executing ledger function
   const [result, cancel] = executeLedgerFunction(
     () => TransportWebHid.create(),
-    (transport) => () => {
-      const ethereum = new Ethereum(transport as any);
+    (transport: Transport) => () => {
+      const ethereum = new Ethereum(transport);
       return ethereum.signPersonalMessage(
         currentRequest.request.derivationPath,
         Buffer.from(decode(currentRequest.request.message58)).toString("hex")
@@ -282,11 +291,11 @@ async function evmSignMessage(
     },
     (step) => {
       const status = [
-        "Connect your Ledger device",
-        "Unlock your Ledger device",
-        "Open the Ethereum App on your Ledger device.",
-        "Approve Signature on your Ledger device.",
-        "Enable Blind Signature",
+        "Connect your Ledger device via USB",
+        "Unlock your Ledger device with your PIN",
+        "Open the Ethereum App on your Ledger device",
+        "Review and approve the signature on your Ledger device",
+        "Enable Blind Signing: On your Ledger, go to Ethereum App Settings → Allow Blind Sign → Yes",
       ];
       setStatus(status[step] ?? "");
     }

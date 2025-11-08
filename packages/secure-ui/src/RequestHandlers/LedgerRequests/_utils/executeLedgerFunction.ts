@@ -60,6 +60,17 @@ export function executeLedgerFunction<R, T extends Transport>(
         );
 
         const isError = isLedgerError(e?.message);
+
+        // Check for Ledger Live conflict
+        if (isError("LEDGER_LIVE_CONFLICT")) {
+          reject(
+            new Error(
+              "LEDGER_LIVE_CONFLICT: Please close Ledger Live and try again"
+            )
+          );
+          return false;
+        }
+
         if (isError("HID_PERMISSIONS_NOT_AVAILABLE")) {
           // It's not uncommon to get one / two permissions error before succesfull connect.
           // so we just count the errors and act on them after the gesture timer ran out.
@@ -136,7 +147,9 @@ export function executeLedgerFunction<R, T extends Transport>(
               )
             ) {
               onStep(2); // requires app
-            } else if (error.message.includes("blind signature")) {
+            } else if (
+              isError("BLIND_SIGNING_NOT_ENABLED", "BLIND_SIGNING_REQUIRED")
+            ) {
               onStep(4); // requires blind signature
             } else if (count < 100) {
               onStep(0);
@@ -219,6 +232,7 @@ const LedgerError = {
   HID_PERMISSIONS_NOT_AVAILABLE: "Access denied to use Ledger device",
   HID_GESTURE_REQUIRED: "Failed to execute 'requestDevice' on 'HID'",
   DOM_INVALID_STATE: "The device was closed unexpectedly.",
+  LEDGER_LIVE_CONFLICT: "cannot open device with path",
   // https://support.ledger.com/hc/en-us/articles/4407690578321-Solving-Error-0x6a83-or-0x6811-
   APP_DEPENDENCY_ISSUE: "0x6A83",
   APP_DEPENDENCY_ISSUE_ALT: "0x6A811",
@@ -241,6 +255,9 @@ const LedgerError = {
   OUTDATED_FIRMWARE_ALT: "0x6E00",
   // https://support.ledger.com/hc/en-us/articles/5131971882397-Solving-0x6a82-error
   USER_MUST_ENABLE_EXPERIMENTAL_FEATURES_IN_LEDGER_LIVE: "0x6A82",
+  // Blind signing errors
+  BLIND_SIGNING_NOT_ENABLED: "blind signature",
+  BLIND_SIGNING_REQUIRED: "Ledger device: Blind sign not enabled",
 } as const;
 
 const isLedgerError =

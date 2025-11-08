@@ -1,3 +1,5 @@
+import { Loader } from "@coral-xyz/tamagui";
+
 import { ImportMnemonic } from "../../../../components/Unlocked/Settings/AddConnectWallet/ImportMnemonic";
 import { ScreenContainer } from "../../../components/ScreenContainer";
 import type {
@@ -16,8 +18,7 @@ export function WalletAddHardwareScreen(
 }
 
 function Loading() {
-  // TODO.
-  return null;
+  return <Loader />;
 }
 
 function Container({
@@ -26,10 +27,6 @@ function Container({
   },
 }: SettingsScreenProps<Routes.WalletAddHardwareScreen>) {
   return (
-    <ImportMnemonic
-      blockchain={blockchain}
-      ledger
-      inputMnemonic={false}
-    />
+    <ImportMnemonic blockchain={blockchain} ledger inputMnemonic={false} />
   );
 }

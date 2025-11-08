@@ -1,7 +1,3 @@
-import type { QueuedUiRequest } from "../../_atoms/requestAtoms";
-
-import { useCallback, useEffect, useState } from "react";
-
 import { Blockchain, getEnv, openLedgerPermissions } from "@coral-xyz/common";
 import {
   BlockchainWalletDescriptorType,
@@ -22,8 +18,10 @@ import Solana from "@ledgerhq/hw-app-solana";
 import Transport from "@ledgerhq/hw-transport";
 import TransportWebHid from "@ledgerhq/hw-transport-webhid";
 import { PublicKey } from "@solana/web3.js";
+import { useCallback, useEffect, useState } from "react";
 
 import { executeLedgerFunction } from "./_utils/executeLedgerFunction";
+import type { QueuedUiRequest } from "../../_atoms/requestAtoms";
 import { RequestConfirmation } from "../../_sharedComponents/RequestConfirmation";
 
 type DerivationPaths = {
@@ -97,6 +95,8 @@ export function LedgerPreviewPublicKeysRequest({
 
   switch (request.blockchain) {
     case Blockchain.SOLANA:
+    case Blockchain.ECLIPSE:
+    case Blockchain.X1:
       return (
         <SelectWallets
           currentRequest={currentRequest}
@@ -104,7 +104,7 @@ export function LedgerPreviewPublicKeysRequest({
           statuses={[
             "Connect your Ledger",
             "Unlock your Ledger",
-            "Open the Solana App on your Ledger device.",
+            `Open the Solana App on your Ledger device.`,
             "Fetching public keys",
           ]}
         />
