@@ -4,7 +4,7 @@
  *
  * Note: not completely done.
  */
-import { useApolloClient, useQuery } from "@apollo/client";
+// import { useApolloClient, useQuery } from "@apollo/client";
 import {
   Blockchain,
   NATIVE_ACCOUNT_RENT_EXEMPTION_LAMPORTS,
@@ -31,8 +31,8 @@ import useAsyncEffect from "use-async-effect";
 
 import type { CachedTokenBalance } from "./hooks";
 import {
-  GET_SWAP_OUTPUT_TOKENS,
-  GET_SWAP_VALID_INPUT_TOKENS,
+  // GET_SWAP_OUTPUT_TOKENS,
+  // GET_SWAP_VALID_INPUT_TOKENS,
   useFromToken,
   useToToken,
 } from "./hooks";
@@ -414,22 +414,10 @@ export function useAvailableForSwap({
 function useSwapValidInputTokensSolanaFn(
   balances: CachedTokenBalance[]
 ): () => Promise<CachedTokenBalance[]> {
-  const apollo = useApolloClient();
-
+  // Stubbed - GraphQL removed
   return useCallback(async () => {
-    const { data } = await apollo.query({
-      query: GET_SWAP_VALID_INPUT_TOKENS,
-      fetchPolicy: "cache-first",
-      variables: {
-        tokens: balances.map((b) => b.token),
-      },
-    });
-    const mints = (data?.jupiterSwapValidInputTokens ?? []) as string[];
-
-    return balances.filter(
-      (b) => mints.includes(b.token) || b.token === SOL_NATIVE_MINT
-    );
-  }, [apollo, balances]);
+    return [];
+  }, [balances]);
 }
 
 // TODO: remove this function as soon as mobile is migrated over to the
@@ -437,69 +425,18 @@ function useSwapValidInputTokensSolanaFn(
 export function useSwapValidInputTokensSolana(
   balances: CachedTokenBalance[]
 ): [CachedTokenBalance[], boolean] {
-  const { data, loading } = useQuery(GET_SWAP_VALID_INPUT_TOKENS, {
-    fetchPolicy: "cache-and-network",
-    variables: {
-      tokens: balances.map((b) => b.token),
-    },
-  });
-
-  const values = useMemo(() => {
-    const mints = (
-      loading ? [] : data?.jupiterSwapValidInputTokens ?? []
-    ) as string[];
-
-    return balances.filter(
-      (b) => mints.includes(b.token) || b.token === SOL_NATIVE_MINT
-    );
-  }, [balances, data, loading]);
-
-  return [values, loading];
+  // Stubbed - GraphQL removed
+  return [[], false];
 }
 
 function useSwapOutputTokensSolanaFn(
   inputToken: string,
   outputBalances: CachedTokenBalance[]
 ): () => Promise<CachedTokenBalance[]> {
-  const apollo = useApolloClient();
-
+  // Stubbed - GraphQL removed
   return useCallback(async () => {
-    const { data } = await apollo.query({
-      query: GET_SWAP_OUTPUT_TOKENS,
-      fetchPolicy: "cache-first",
-      variables: {
-        inputToken: inputToken === SOL_NATIVE_MINT ? WSOL_MINT : inputToken,
-      },
-    });
-
-    const nodes = (() =>
-      data?.jupiterSwapOutputTokens?.map((t) => {
-        const b = outputBalances.find(
-          (b) =>
-            b.token === (t.address === WSOL_MINT ? SOL_NATIVE_MINT : t.address)
-        );
-
-        return {
-          id: b?.id ?? "",
-          amount: b?.amount ?? "0",
-          displayAmount: b?.displayAmount ?? "0",
-          marketData: {
-            // @ts-ignore - Mock GraphQL data
-            value: b?.marketData?.value ?? 0,
-            // @ts-ignore - Mock GraphQL data
-            valueChange: b?.marketData?.valueChange ?? 0,
-          },
-          token: t.address,
-          // @ts-ignore - Mock GraphQL data
-          tokenListEntry: {
-            ...t,
-            name: t.address === WSOL_MINT ? "Solana" : t.name,
-          },
-        };
-      }) ?? [])();
-
-    return nodes;
-  }, [apollo, inputToken, outputBalances]);
+    return [];
+  }, [inputToken, outputBalances]);
 }
 
 // TODO: remove this function as soon as mobile is migrated over to the
@@ -508,46 +445,8 @@ export function useSwapOutputTokensSolana(
   inputToken: string,
   outputBalances: CachedTokenBalance[]
 ): [CachedTokenBalance[], boolean] {
-  const { data, loading } = useQuery(GET_SWAP_OUTPUT_TOKENS, {
-    fetchPolicy: "cache-and-network",
-    variables: {
-      inputToken: inputToken === SOL_NATIVE_MINT ? WSOL_MINT : inputToken,
-    },
-  });
-
-  const nodes = useMemo<CachedTokenBalance[]>(
-    () =>
-      loading
-        ? []
-        : data?.jupiterSwapOutputTokens?.map((t) => {
-            const b = outputBalances.find(
-              (b) =>
-                b.token ===
-                (t.address === WSOL_MINT ? SOL_NATIVE_MINT : t.address)
-            );
-
-            return {
-              id: b?.id ?? "",
-              amount: b?.amount ?? "0",
-              displayAmount: b?.displayAmount ?? "0",
-              marketData: {
-                // @ts-ignore - Mock GraphQL data
-                value: b?.marketData?.value ?? 0,
-                // @ts-ignore - Mock GraphQL data
-                valueChange: b?.marketData?.valueChange ?? 0,
-              },
-              token: t.address,
-              // @ts-ignore - Mock GraphQL data
-              tokenListEntry: {
-                ...t,
-                name: t.address === WSOL_MINT ? "Solana" : t.name,
-              },
-            };
-          }) ?? [],
-    [outputBalances, data, loading]
-  );
-
-  return [nodes, loading];
+  // Stubbed - GraphQL removed
+  return [[], false];
 }
 
 enum SwapType {
