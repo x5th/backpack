@@ -36,7 +36,6 @@ import BottomSheet, {
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import QRCode from "react-native-qrcode-svg";
-import * as ExpoClipboard from "expo-clipboard";
 
 // Network configurations
 const API_SERVER = "http://162.250.126.66:4000";
@@ -364,8 +363,8 @@ export default function App() {
     setShowSendDrawer(true);
   };
 
-  const copyToClipboard = async (text) => {
-    await ExpoClipboard.setStringAsync(text);
+  const copyToClipboard = (text) => {
+    Clipboard.setString(text);
     Alert.alert("Copied", "Address copied to clipboard");
   };
 
@@ -1940,6 +1939,7 @@ const styles = StyleSheet.create({
   debugLogList: {
     flex: 1,
     marginBottom: 16,
+    maxHeight: 400,
   },
   debugNoLogs: {
     fontSize: 14,
