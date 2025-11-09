@@ -33,7 +33,8 @@ const path = require("path");
 const PORT = 4000;
 const X1_MAINNET_RPC_URL = "https://rpc.mainnet.x1.xyz";
 const X1_TESTNET_RPC_URL = "https://rpc.testnet.x1.xyz";
-const SOLANA_MAINNET_RPC_URL = "https://capable-autumn-thunder.solana-mainnet.quiknode.pro/3d4ed46b454fa0ca3df983502fdf15fe87145d9e/";
+const SOLANA_MAINNET_RPC_URL =
+  "https://capable-autumn-thunder.solana-mainnet.quiknode.pro/3d4ed46b454fa0ca3df983502fdf15fe87145d9e/";
 const SOLANA_DEVNET_RPC_URL = "https://api.devnet.solana.com";
 const SOLANA_TESTNET_RPC_URL = "https://api.testnet.solana.com";
 const XNT_PRICE = 1.0; // $1 per XNT
@@ -318,9 +319,9 @@ function updateLastIndexed(address) {
 // Auto-register wallet when it queries transactions (if not already registered)
 function autoRegisterWallet(address, providerId) {
   return new Promise((resolve, reject) => {
-    const network = providerId.toLowerCase().includes("mainnet")
-      ? "mainnet"
-      : "testnet";
+    // Use the full providerId as network (e.g., "X1-mainnet", "SOLANA-mainnet")
+    // This ensures wallets are indexed separately for each blockchain
+    const network = providerId;
 
     const sql = `INSERT OR IGNORE INTO wallets (address, network, enabled)
       VALUES (?, ?, 1)`;
@@ -430,7 +431,8 @@ const ORACLE_ENDPOINT = "http://oracle.mainnet.x1.xyz:3000/api/state";
 let solPriceCache = { price: 158, timestamp: 0 }; // Default $158, cache for 5 minutes
 async function getSolPrice() {
   const now = Date.now();
-  if (now - solPriceCache.timestamp < 300000) { // 5 minutes
+  if (now - solPriceCache.timestamp < 300000) {
+    // 5 minutes
     return solPriceCache.price;
   }
 
@@ -538,7 +540,9 @@ async function getWalletData(address, network = "mainnet", blockchain = "x1") {
       // Not in cache or expired, fetch from RPC
       balance = await getX1Balance(address, rpcUrl);
       setCachedBalance(address, `${blockchain}-${network}`, balance);
-      console.log(`  Balance from ${blockchain.toUpperCase()} RPC: ${balance} ${tokenSymbol}`);
+      console.log(
+        `  Balance from ${blockchain.toUpperCase()} RPC: ${balance} ${tokenSymbol}`
+      );
     }
 
     // Determine logo based on blockchain
@@ -716,6 +720,78 @@ const server = http.createServer((req, res) => {
         );
       }
     });
+    return;
+  }
+
+  // Handle GET /transactions/:address for activity page (alternative to POST)
+  if (pathname.startsWith("/transactions/") && req.method === "GET") {
+    (async () => {
+      try {
+        // Extract address from URL path
+        const pathParts = pathname.split("/");
+        const address = pathParts[2];
+
+        // Parse query parameters
+        const queryParams = new URLSearchParams(parsedUrl.search || "");
+        const providerId = queryParams.get("providerId") || "X1-mainnet";
+        const limit = Math.min(parseInt(queryParams.get("limit") || "50"), 50);
+        const offset = parseInt(queryParams.get("offset") || "0");
+        const tokenMint = queryParams.get("tokenMint");
+
+        console.log(`\n📥 Transaction Activity Request (GET):`);
+        console.log(
+          `   Address: ${address} (prefix: ${getWalletPrefix(address)})`
+        );
+        console.log(`   Provider: ${providerId}`);
+        console.log(`   Limit: ${limit}, Offset: ${offset}`);
+        if (tokenMint) console.log(`   Token Mint: ${tokenMint}`);
+
+        // Auto-register wallet for indexing
+        await autoRegisterWallet(address, providerId);
+
+        // Fetch from database
+        const transactions = await getTransactions(
+          address,
+          providerId,
+          limit,
+          offset
+        );
+        const totalCount = await getTransactionCount(address, providerId);
+        const hasMore = offset + transactions.length < totalCount;
+
+        const response = {
+          transactions,
+          hasMore,
+          totalCount,
+          requestParams: {
+            address,
+            providerId,
+            limit,
+            offset,
+          },
+          meta: {
+            timestamp: new Date().toISOString(),
+            version: "1.0.0",
+          },
+        };
+
+        console.log(
+          `✅ Returning ${transactions.length} transactions from DB (total: ${totalCount}, hasMore: ${hasMore})\n`
+        );
+
+        res.writeHead(200);
+        res.end(JSON.stringify(response, null, 2));
+      } catch (error) {
+        console.error(`❌ GET Transaction request error: ${error.message}`);
+        res.writeHead(500);
+        res.end(
+          JSON.stringify({
+            error: "Internal Server Error",
+            message: error.message,
+          })
+        );
+      }
+    })();
     return;
   }
 

@@ -30,6 +30,16 @@ export function ActivityPage({
   const theme = useTheme();
   const connectionUrl = useRecoilValue(blockchainConnectionUrl(blockchain));
 
+  // Log when component loads
+  useEffect(() => {
+    console.log("📋 [ActivityPage] Component loaded with:", {
+      blockchain,
+      connectionUrl,
+      address,
+      transactionCount: transactions.length,
+    });
+  }, [blockchain, connectionUrl, address, transactions.length]);
+
   // Expose refresh function to parent component
   useEffect(() => {
     if (onRefreshReady) {
@@ -123,11 +133,17 @@ function TransactionItem({
   const theme = useTheme();
 
   const handleClick = () => {
+    console.log("🔍 [ActivityPage] Transaction clicked:", {
+      hash: transaction.hash,
+      blockchain,
+      connectionUrl,
+    });
     const explorerUrl = getExplorerUrl(
       transaction.hash,
       blockchain,
       connectionUrl
     );
+    console.log("🌐 [ActivityPage] Opening explorer:", explorerUrl);
     window.open(explorerUrl, "_blank");
   };
 
@@ -237,16 +253,26 @@ function formatTimestamp(timestamp: string): string {
 
 function getExplorerUrl(
   hash: string,
-  blockchain: Blockchain,
+  _blockchain: Blockchain,
   connectionUrl: string
 ): string {
-  if (blockchain.toLowerCase() === "x1") {
-    // Detect mainnet or testnet based on connection URL
+  // Determine the correct explorer based on the connection URL
+  // The blockchain type is always "X1" for the wallet, but it can connect to Solana
+  if (connectionUrl.includes("solana")) {
+    // Use Solscan for Solana mainnet, explorer.solana.com for others
     if (connectionUrl.includes("mainnet")) {
-      return `https://explorer.mainnet.x1.xyz/tx/${hash}`;
-    } else {
-      return `https://explorer.testnet.x1.xyz/tx/${hash}`;
+      return `https://solscan.io/tx/${hash}`;
+    } else if (connectionUrl.includes("devnet")) {
+      return `https://explorer.solana.com/tx/${hash}?cluster=devnet`;
+    } else if (connectionUrl.includes("testnet")) {
+      return `https://explorer.solana.com/tx/${hash}?cluster=testnet`;
     }
+    return `https://solscan.io/tx/${hash}`;
   }
-  return `https://explorer.solana.com/tx/${hash}`;
+
+  // X1 blockchain
+  if (connectionUrl.includes("testnet")) {
+    return `https://explorer.testnet.x1.xyz/tx/${hash}`;
+  }
+  return `https://explorer.mainnet.x1.xyz/tx/${hash}`;
 }
