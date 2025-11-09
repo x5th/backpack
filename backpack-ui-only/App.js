@@ -715,7 +715,7 @@ export default function App() {
                 </View>
                 <View style={styles.bottomSheetWalletRight}>
                   <TouchableOpacity style={styles.bottomSheetCopyBtn}>
-                    <Text style={styles.bottomSheetCopyText}>Copy</Text>
+                    <Text style={styles.bottomSheetCopyIcon}>⧉</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.bottomSheetMoreBtn}>
                     <Text style={styles.bottomSheetMoreText}>⋯</Text>
@@ -1464,14 +1464,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   bottomSheetCopyBtn: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 6,
-    backgroundColor: "#333333",
+    backgroundColor: "transparent",
     borderRadius: 6,
   },
-  bottomSheetCopyText: {
-    fontSize: 12,
-    color: "#FFFFFF",
+  bottomSheetCopyIcon: {
+    fontSize: 18,
+    color: "#999999",
   },
   bottomSheetMoreBtn: {
     paddingHorizontal: 8,
@@ -1484,11 +1484,7 @@ const styles = StyleSheet.create({
   bottomSheetAddButton: {
     paddingVertical: 16,
     alignItems: "center",
-    backgroundColor: "#0a0a0a",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#333333",
-    borderStyle: "dashed",
+    backgroundColor: "transparent",
     marginTop: 8,
   },
   bottomSheetAddButtonText: {
