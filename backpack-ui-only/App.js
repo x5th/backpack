@@ -24,6 +24,7 @@ import {
   Pressable,
   Linking,
   Clipboard,
+  TextInput,
 } from "react-native";
 import { Keypair, Connection, clusterApiUrl } from "@solana/web3.js";
 import * as bip39 from "bip39";
@@ -34,6 +35,8 @@ import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
+import QRCode from "react-native-qrcode-svg";
+import * as ExpoClipboard from "expo-clipboard";
 
 // Network configurations
 const API_SERVER = "http://162.250.126.66:4000";
@@ -148,6 +151,13 @@ export default function App() {
   const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
   const [showDebugDrawer, setShowDebugDrawer] = useState(false);
   const [debugLogs, setDebugLogs] = useState([]);
+
+  // Send and Receive states
+  const [showReceiveDrawer, setShowReceiveDrawer] = useState(false);
+  const [showSendDrawer, setShowSendDrawer] = useState(false);
+  const [sendAmount, setSendAmount] = useState("");
+  const [sendAddress, setSendAddress] = useState("");
+  const [showAddressSelector, setShowAddressSelector] = useState(false);
 
   // Bottom sheet ref
   const bottomSheetRef = useRef(null);
@@ -347,11 +357,28 @@ export default function App() {
   };
 
   const handleReceive = () => {
-    Alert.alert("Receive", "Receive functionality would open here");
+    setShowReceiveDrawer(true);
   };
 
   const handleSend = () => {
-    Alert.alert("Send", "Send functionality would open here");
+    setShowSendDrawer(true);
+  };
+
+  const copyToClipboard = async (text) => {
+    await ExpoClipboard.setStringAsync(text);
+    Alert.alert("Copied", "Address copied to clipboard");
+  };
+
+  const handleSendSubmit = async () => {
+    if (!sendAddress || !sendAmount) {
+      Alert.alert("Error", "Please enter both address and amount");
+      return;
+    }
+    // TODO: Implement actual send transaction
+    Alert.alert("Success", `Sent ${sendAmount} ${getNativeTokenInfo().symbol} to ${sendAddress.substring(0, 8)}...`);
+    setShowSendDrawer(false);
+    setSendAmount("");
+    setSendAddress("");
   };
 
   const handleSwap = () => {
@@ -977,6 +1004,186 @@ export default function App() {
               >
                 <Text style={styles.debugClearButtonText}>Clear Logs</Text>
               </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Receive Drawer */}
+      <Modal
+        visible={showReceiveDrawer}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowReceiveDrawer(false)}
+      >
+        <Pressable
+          style={styles.settingsDrawerOverlay}
+          onPress={() => setShowReceiveDrawer(false)}
+        >
+          <Pressable
+            style={styles.settingsDrawerContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.settingsDrawerContentArea}>
+              {/* Header */}
+              <View style={styles.settingsDrawerHeader}>
+                <Text style={styles.settingsDrawerTitle}>Receive {getNativeTokenInfo().symbol}</Text>
+                <TouchableOpacity onPress={() => setShowReceiveDrawer(false)}>
+                  <Text style={styles.settingsDrawerClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* QR Code */}
+              <View style={styles.receiveQRContainer}>
+                <View style={styles.receiveQRWrapper}>
+                  <QRCode
+                    value={selectedWallet.address}
+                    size={200}
+                    backgroundColor="white"
+                    color="black"
+                  />
+                </View>
+              </View>
+
+              {/* Address */}
+              <View style={styles.receiveAddressContainer}>
+                <Text style={styles.receiveAddressLabel}>Your Address</Text>
+                <Text style={styles.receiveAddressText} numberOfLines={1}>
+                  {selectedWallet.address}
+                </Text>
+              </View>
+
+              {/* Copy Button */}
+              <TouchableOpacity
+                style={styles.receiveCopyButton}
+                onPress={() => copyToClipboard(selectedWallet.address)}
+              >
+                <Text style={styles.receiveCopyButtonText}>Copy Address</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Send Drawer */}
+      <Modal
+        visible={showSendDrawer}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowSendDrawer(false)}
+      >
+        <Pressable
+          style={styles.settingsDrawerOverlay}
+          onPress={() => setShowSendDrawer(false)}
+        >
+          <Pressable
+            style={styles.settingsDrawerContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.settingsDrawerContentArea}>
+              {/* Header */}
+              <View style={styles.settingsDrawerHeader}>
+                <Text style={styles.settingsDrawerTitle}>Send {getNativeTokenInfo().symbol}</Text>
+                <TouchableOpacity onPress={() => setShowSendDrawer(false)}>
+                  <Text style={styles.settingsDrawerClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Balance Display */}
+              <View style={styles.sendBalanceContainer}>
+                <Text style={styles.sendBalanceLabel}>Available Balance</Text>
+                <TouchableOpacity onPress={() => setSendAmount(balance)}>
+                  <Text style={styles.sendBalanceText}>{balance} {getNativeTokenInfo().symbol}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Amount Input */}
+              <View style={styles.sendInputContainer}>
+                <Text style={styles.sendInputLabel}>Amount</Text>
+                <TextInput
+                  style={styles.sendInput}
+                  placeholder="0.00"
+                  placeholderTextColor="#666666"
+                  value={sendAmount}
+                  onChangeText={setSendAmount}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              {/* Address Input */}
+              <View style={styles.sendInputContainer}>
+                <View style={styles.sendAddressHeader}>
+                  <Text style={styles.sendInputLabel}>Recipient Address</Text>
+                  <TouchableOpacity onPress={() => setShowAddressSelector(true)}>
+                    <Text style={styles.sendSelectAddressText}>Select Address</Text>
+                  </TouchableOpacity>
+                </View>
+                <TextInput
+                  style={styles.sendInput}
+                  placeholder="Enter address..."
+                  placeholderTextColor="#666666"
+                  value={sendAddress}
+                  onChangeText={setSendAddress}
+                  autoCapitalize="none"
+                />
+              </View>
+
+              {/* Send Button */}
+              <TouchableOpacity
+                style={styles.sendSubmitButton}
+                onPress={handleSendSubmit}
+              >
+                <Text style={styles.sendSubmitButtonText}>Send</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Address Selector Modal */}
+      <Modal
+        visible={showAddressSelector}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAddressSelector(false)}
+      >
+        <Pressable
+          style={styles.settingsDrawerOverlay}
+          onPress={() => setShowAddressSelector(false)}
+        >
+          <Pressable
+            style={styles.settingsDrawerContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.settingsDrawerContentArea}>
+              {/* Header */}
+              <View style={styles.settingsDrawerHeader}>
+                <Text style={styles.settingsDrawerTitle}>Select Address</Text>
+                <TouchableOpacity onPress={() => setShowAddressSelector(false)}>
+                  <Text style={styles.settingsDrawerClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Address List */}
+              <ScrollView style={styles.addressList}>
+                {wallets.map((wallet) => (
+                  <TouchableOpacity
+                    key={wallet.id}
+                    style={styles.addressItem}
+                    onPress={() => {
+                      setSendAddress(wallet.address);
+                      setShowAddressSelector(false);
+                    }}
+                  >
+                    <View style={styles.addressItemContent}>
+                      <Text style={styles.addressItemName}>{wallet.name}</Text>
+                      <Text style={styles.addressItemAddress} numberOfLines={1}>
+                        {wallet.address}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           </Pressable>
         </Pressable>
@@ -1756,5 +1963,127 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#FFFFFF",
+  },
+  // Receive Modal Styles
+  receiveQRContainer: {
+    alignItems: "center",
+    paddingVertical: 30,
+  },
+  receiveQRWrapper: {
+    padding: 20,
+    backgroundColor: "white",
+    borderRadius: 16,
+  },
+  receiveAddressContainer: {
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  receiveAddressLabel: {
+    fontSize: 12,
+    color: "#888888",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  receiveAddressText: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    textAlign: "center",
+    fontFamily: "monospace",
+  },
+  receiveCopyButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    backgroundColor: "#4A90E2",
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  receiveCopyButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  // Send Modal Styles
+  sendBalanceContainer: {
+    marginBottom: 24,
+    padding: 16,
+    backgroundColor: "#0a0a0a",
+    borderRadius: 12,
+  },
+  sendBalanceLabel: {
+    fontSize: 12,
+    color: "#888888",
+    marginBottom: 4,
+  },
+  sendBalanceText: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#4A90E2",
+  },
+  sendInputContainer: {
+    marginBottom: 20,
+  },
+  sendInputLabel: {
+    fontSize: 12,
+    color: "#888888",
+    marginBottom: 8,
+  },
+  sendInput: {
+    backgroundColor: "#0a0a0a",
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#333333",
+  },
+  sendAddressHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  sendSelectAddressText: {
+    fontSize: 12,
+    color: "#4A90E2",
+    fontWeight: "600",
+  },
+  sendSubmitButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    backgroundColor: "#4A90E2",
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  sendSubmitButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  // Address Selector Styles
+  addressList: {
+    flex: 1,
+  },
+  addressItem: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: "#0a0a0a",
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  addressItemContent: {
+    flex: 1,
+  },
+  addressItemName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginBottom: 4,
+  },
+  addressItemAddress: {
+    fontSize: 12,
+    color: "#888888",
+    fontFamily: "monospace",
   },
 });
