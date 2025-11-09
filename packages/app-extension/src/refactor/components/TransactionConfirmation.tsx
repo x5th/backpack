@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback } from "react";
-import type { Blockchain } from "@coral-xyz/common";
+import { Blockchain } from "@coral-xyz/common";
 import { useTranslation } from "@coral-xyz/i18n";
 import { CrossIcon, Loading } from "@coral-xyz/react-common";
 import {
@@ -161,12 +161,29 @@ export function ConfirmationButtons({
 }) {
   const { t } = useTranslation();
   const connectionUrl = useBlockchainConnectionUrl(blockchain);
-  const explorer = useBlockchainExplorer(blockchain);
+
+  // Determine the correct blockchain and explorer based on connection URL
+  // When using Solana RPC with X1 wallet, use Solana explorer
+  const isSolanaNetwork = connectionUrl?.includes('solana.com') ||
+                          connectionUrl?.includes('solana-mainnet.quiknode.pro') ||
+                          connectionUrl?.includes('solana-devnet') ||
+                          connectionUrl?.includes('solana-testnet');
+
+  const effectiveBlockchain = isSolanaNetwork ? Blockchain.SOLANA : blockchain;
+  const explorer = useBlockchainExplorer(effectiveBlockchain);
 
   const openExplorerLink = useCallback(() => {
     const url = explorerUrl(explorer, signature, connectionUrl);
+    console.log("🔗 [Explorer] Opening:", {
+      blockchain,
+      effectiveBlockchain,
+      explorer,
+      signature,
+      connectionUrl,
+      generatedUrl: url
+    });
     window.open(url, "_blank");
-  }, [connectionUrl, explorer, signature]);
+  }, [blockchain, effectiveBlockchain, connectionUrl, explorer, signature]);
 
   return (
     <YStack ai="center" gap={24} width="100%">

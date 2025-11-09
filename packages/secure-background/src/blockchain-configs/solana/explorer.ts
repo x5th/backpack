@@ -5,5 +5,5 @@ export const SolanaExplorer = {
   SOLANA_FM: "https://solana.fm",
   XRAY: "https://xray.helius.xyz/",
 
-  DEFAULT: "https://solscan.io",
+  DEFAULT: "https://explorer.solana.com",
 };

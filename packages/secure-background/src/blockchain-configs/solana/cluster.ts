@@ -1,4 +1,4 @@
-export const DEFAULT_SOLANA_CLUSTER = "https://api.mainnet-beta.solana.com";
+export const DEFAULT_SOLANA_CLUSTER = "https://capable-autumn-thunder.solana-mainnet.quiknode.pro/3d4ed46b454fa0ca3df983502fdf15fe87145d9e/";
 export const SolanaCluster = {
   MAINNET: DEFAULT_SOLANA_CLUSTER,
   DEVNET: "https://api.devnet.solana.com",

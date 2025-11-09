@@ -20,30 +20,37 @@ export interface Transaction {
 }
 
 function getProviderId(blockchain: Blockchain, connectionUrl: string): string {
-  const blockchainLower = blockchain.toLowerCase();
+  // Determine providerId based on connection URL
+  // Since we treat Solana networks as RPC alternatives for X1 wallets,
+  // we need to detect the network from the URL, not the blockchain type
 
-  if (blockchainLower === "x1") {
-    // Detect if connected to mainnet or testnet based on RPC URL
-    if (connectionUrl.includes("mainnet")) {
-      return "X1-mainnet";
-    } else {
-      return "X1-testnet";
-    }
+  if (!connectionUrl) {
+    return blockchain.toUpperCase();
   }
 
-  if (blockchainLower === "solana") {
-    // Detect Solana network based on RPC URL
-    if (connectionUrl.includes("mainnet")) {
+  // Check for Solana networks first (including QuickNode)
+  if (connectionUrl.includes('solana.com') || connectionUrl.includes('solana-mainnet.quiknode.pro') || connectionUrl.includes('solana-devnet') || connectionUrl.includes('solana-testnet')) {
+    if (connectionUrl.includes('mainnet')) {
       return "SOLANA-mainnet";
-    } else if (connectionUrl.includes("devnet")) {
+    } else if (connectionUrl.includes('devnet')) {
       return "SOLANA-devnet";
-    } else if (connectionUrl.includes("testnet")) {
+    } else if (connectionUrl.includes('testnet')) {
       return "SOLANA-testnet";
     }
-    // Default to mainnet if URL doesn't match known patterns
     return "SOLANA-mainnet";
   }
 
+  // Check for X1 networks
+  if (connectionUrl.includes('x1.xyz')) {
+    if (connectionUrl.includes('testnet')) {
+      return "X1-testnet";
+    } else if (connectionUrl.includes('mainnet')) {
+      return "X1-mainnet";
+    }
+    return "X1-testnet";
+  }
+
+  // Fallback to blockchain type
   return blockchain.toUpperCase();
 }
 

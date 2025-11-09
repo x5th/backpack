@@ -156,12 +156,13 @@ export function BalanceDetails({
       return undefined;
     }
 
-    // Override XNT token price to $1.00 for X1 blockchain
-    const isX1Provider = providerId.toLowerCase() === "x1";
+    // Override native token price to $1.00 for X1 blockchain (XNT)
+    // For Solana, use the market price from the server
+    const isX1Network = connectionUrl?.includes('x1.xyz') || false;
     const nativeMintAddress = "11111111111111111111111111111111"; // Native token address for SVM chains
 
     if (
-      isX1Provider &&
+      isX1Network &&
       foundToken.token === nativeMintAddress &&
       foundToken.tokenListEntry?.symbol === "XNT"
     ) {

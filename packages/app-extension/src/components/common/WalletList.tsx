@@ -10,6 +10,7 @@ import {
   SecretKeyIcon,
 } from "@coral-xyz/react-common";
 import {
+  blockchainConnectionUrl,
   enabledBlockchainsAtom,
   getBlockchainLogo,
   secureUserAtom,
@@ -114,7 +115,17 @@ function WalletButton({
 }) {
   const classes = useStyles();
   const theme = useTheme();
-  const iconUrl = getBlockchainLogo(wallet.blockchain);
+  const connectionUrl = useRecoilValue(blockchainConnectionUrl(wallet.blockchain));
+
+  // Determine which logo to show based on connection URL
+  // When on Solana networks, show Solana logo; otherwise show blockchain logo
+  const iconUrl = (() => {
+    if (connectionUrl?.includes('solana.com') || connectionUrl?.includes('solana-mainnet.quiknode.pro')) {
+      return './solana.png';
+    }
+    return getBlockchainLogo(wallet.blockchain);
+  })();
+
   return (
     <div
       style={{
@@ -420,7 +431,17 @@ export function AddButton({
 }
 
 function X1LogoHeader() {
-  const blockchainLogo = getBlockchainLogo(Blockchain.X1);
+  const connectionUrl = useRecoilValue(blockchainConnectionUrl(Blockchain.X1));
+
+  // Determine which logo to show based on connection URL
+  // When on Solana networks, show Solana logo; otherwise show X1 logo
+  const blockchainLogo = (() => {
+    if (connectionUrl?.includes('solana.com') || connectionUrl?.includes('solana-mainnet.quiknode.pro')) {
+      return './solana.png';
+    }
+    return getBlockchainLogo(Blockchain.X1);
+  })();
+
   return (
     <XStack display="flex" paddingHorizontal="$4" paddingVertical="$2" justifyContent="center">
       <img

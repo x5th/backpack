@@ -1,8 +1,8 @@
 import type {
   AutolockSettings,
-  Blockchain,
   Preferences,
 } from "@coral-xyz/common";
+import { Blockchain } from "@coral-xyz/common";
 import { DEFAULT_AUTO_LOCK_INTERVAL_SECS } from "@coral-xyz/secure-background/legacyCommon";
 import type { User } from "@coral-xyz/secure-background/types";
 import type { Commitment } from "@solana/web3.js";
@@ -156,7 +156,25 @@ export const blockchainConnectionUrl = selectorFamily<string, Blockchain>({
     (blockchain: Blockchain) =>
     ({ get }) => {
       const p = get(preferences);
-      return p.blockchains[blockchain].connectionUrl;
+      const blockchainConfig = p.blockchains[blockchain];
+
+      // Handle case where blockchain config doesn't exist yet
+      if (!blockchainConfig || !blockchainConfig.connectionUrl) {
+        // Return default URLs based on blockchain type
+        if (blockchain === Blockchain.X1) {
+          return "https://rpc.mainnet.x1.xyz";
+        }
+        return "";
+      }
+
+      let connectionUrl = blockchainConfig.connectionUrl;
+
+      // Migrate old Solana public RPC to QuickNode
+      if (connectionUrl === "https://api.mainnet-beta.solana.com") {
+        connectionUrl = "https://capable-autumn-thunder.solana-mainnet.quiknode.pro/3d4ed46b454fa0ca3df983502fdf15fe87145d9e/";
+      }
+
+      return connectionUrl;
     },
 });
 
@@ -169,7 +187,14 @@ export const blockchainConnectionUrlNullable = selectorFamily<
     (blockchain: Blockchain) =>
     ({ get }) => {
       const p = get(preferencesNullable);
-      return p?.blockchains[blockchain].connectionUrl ?? null;
+      let connectionUrl = p?.blockchains[blockchain].connectionUrl ?? null;
+
+      // Migrate old Solana public RPC to QuickNode
+      if (connectionUrl === "https://api.mainnet-beta.solana.com") {
+        connectionUrl = "https://capable-autumn-thunder.solana-mainnet.quiknode.pro/3d4ed46b454fa0ca3df983502fdf15fe87145d9e/";
+      }
+
+      return connectionUrl;
     },
 });
 

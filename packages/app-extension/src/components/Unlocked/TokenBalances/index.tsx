@@ -5,13 +5,18 @@ import {
   TokenBalances as _TokenBalances,
 } from "@coral-xyz/data-components";
 import { useTranslation } from "@coral-xyz/i18n";
-import { useActiveWallet, useIsDevnet } from "@coral-xyz/recoil";
+import {
+  blockchainConnectionUrl,
+  useActiveWallet,
+  useIsDevnet,
+} from "@coral-xyz/recoil";
 import {
   temporarilyMakeStylesForBrowserExtension,
   XStack,
   YStack,
 } from "@coral-xyz/tamagui";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
+import { useRecoilValueLoadable } from "recoil";
 
 import { SkeletonRow } from "../../common/TokenTable";
 import { TransferWidget } from "../Balances/TransferWidget";
@@ -36,12 +41,31 @@ export function TokenBalances() {
   const { publicKey, blockchain } = useActiveWallet();
   const navigation = useNavigation<any>();
   const isDevnet = useIsDevnet();
+
+  // Safely get connection URL using loadable to handle errors
+  const connectionUrlLoadable = useRecoilValueLoadable(
+    blockchainConnectionUrl(blockchain)
+  );
+
+  // Get connection URL with fallback
+  const connectionUrl =
+    connectionUrlLoadable.state === "hasValue"
+      ? connectionUrlLoadable.contents
+      : undefined;
+
+  // Determine if we're on Solana network based on connection URL
+  const isSolanaNetwork = connectionUrl?.includes("solana") ?? false;
   const swapEnabled = blockchain === Blockchain.SOLANA && !isDevnet;
+
+  // Use SOLANA or X1 as providerId based on the connection URL
+  const providerId = isSolanaNetwork
+    ? "SOLANA-mainnet"
+    : (blockchain.toUpperCase() as ProviderId);
 
   return (
     <_TokenBalances
       address={publicKey}
-      providerId={blockchain.toUpperCase() as ProviderId}
+      providerId={providerId as ProviderId}
       fetchPolicy="cache-and-network"
       tableFooterComponent={
         <XStack

@@ -56,7 +56,7 @@ const swcLoaderConfiguration = {
       env: {
         targets: browserslist,
       },
-      sourceMap: isDevelopment,
+      sourceMap: true, // Always enable source maps
       jsc: {
         target: "es2022",
         parser: {
@@ -180,6 +180,7 @@ const {
     }
   : {
       dir: "build",
+      devtool: "source-map",
       plugins: [new ForkTsCheckerWebpackPlugin()],
     };
 

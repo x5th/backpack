@@ -28,74 +28,18 @@ export const useFetchSolanaBlowfishEvaluation = (
     evaluation?: SolanaScanTransactionsResponse;
     error?: any;
   }> => {
-    // Skip Blowfish for X1 blockchain (not supported)
-    const isX1 = connectionUrl?.includes("rpc.mainnet.x1.xyz");
-    if (isX1) {
-      return {
-        evaluation: {
-          aggregated: {
-            action: "NONE" as const,
-            warnings: [],
-            error: null,
-            expectedStateChanges: {},
-          },
-          perTransaction: [],
-        } as SolanaScanTransactionsResponse,
-      };
-    }
-
-    try {
-      // Abort request if takes too long
-      const controller = new AbortController();
-      const signal = controller.signal;
-      setTimeout(() => {
-        controller.abort();
-      }, REQUEST_TIMEOUT_LIMIT);
-
-      const headers = new Headers();
-      headers.append("Content-Type", "application/json");
-      headers.append("X-API-VERSION", "2023-06-05");
-      const params = {
-        transactions,
-        userAccount,
-        metadata: {
-          origin,
+    // Blowfish queries disabled - return empty evaluation for all chains
+    return {
+      evaluation: {
+        aggregated: {
+          action: "NONE" as const,
+          warnings: [],
+          error: null,
+          expectedStateChanges: {},
         },
-      };
-      const init = {
-        method: "POST",
-        headers,
-        body: JSON.stringify(params),
-      };
-
-      const endpoint = `${apiUrl}?language=en`;
-      const request = new Request(endpoint, init);
-      const response = await fetch(request, { signal });
-
-      if (response.ok) {
-        // Returned success, parse body
-        const evaluation = await response.json();
-        return { evaluation };
-      } else {
-        const errMessage = await response.json();
-        return {
-          error: new Error(
-            `Blowfish API returned non-200 response: ${
-              response.status
-            }: ${JSON.stringify(errMessage)}`
-          ),
-        };
-      }
-    } catch (error: any) {
-      // Note(fabio): Must lowercase error message b/c in React Native the keyword is capitalized
-      // whereas in the browser-ext it isn't
-      if (error.message.toLowerCase().includes("aborted")) {
-        return { error: new Error("Request timeout reached") };
-      } else {
-        // Other error
-        return { error };
-      }
-    }
+        perTransaction: [],
+      } as SolanaScanTransactionsResponse,
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify({ transactions, origin, userAccount, connectionUrl })]);
 

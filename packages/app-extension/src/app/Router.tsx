@@ -53,12 +53,12 @@ function TestnetBanner() {
     } else if (connectionUrl === "https://rpc.mainnet.x1.xyz") {
       return developerMode ? "X1 MAINNET • DEVELOPER MODE" : "X1 MAINNET";
     }
-    // Check Solana URLs
-    else if (connectionUrl === "https://api.mainnet-beta.solana.com") {
+    // Check Solana URLs (including QuickNode)
+    else if (connectionUrl === "https://api.mainnet-beta.solana.com" || connectionUrl?.includes("solana-mainnet.quiknode.pro")) {
       return developerMode ? "SOLANA MAINNET • DEVELOPER MODE" : "SOLANA MAINNET";
-    } else if (connectionUrl === "https://api.devnet.solana.com") {
+    } else if (connectionUrl === "https://api.devnet.solana.com" || connectionUrl?.includes("solana-devnet")) {
       return developerMode ? "SOLANA DEVNET • DEVELOPER MODE" : "SOLANA DEVNET";
-    } else if (connectionUrl === "https://api.testnet.solana.com") {
+    } else if (connectionUrl === "https://api.testnet.solana.com" || connectionUrl?.includes("solana-testnet")) {
       return developerMode ? "SOLANA TESTNET • DEVELOPER MODE" : "SOLANA TESTNET";
     }
     return null;
@@ -95,43 +95,8 @@ function TestnetBanner() {
 }
 
 function OfflineBanner() {
-  const [offline, setOffline] = useState(!navigator.onLine);
-  useEffect(() => {
-    const handleOffline = () => setOffline(true);
-    const handleOnline = () => setOffline(false);
-    window.addEventListener("offline", handleOffline);
-    window.addEventListener("online", handleOnline);
-    return () => {
-      window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("online", handleOnline);
-    };
-  }, []);
-  useEffect(() => {
-    // navigator.onLine is unreliable
-    fetch(BACKEND_API_URL, { method: "HEAD" }).catch(() => {
-      setOffline(true);
-    });
-  }, []);
-  if (!offline) {
-    return null;
-  }
-  return (
-    <XStack
-      position="absolute"
-      width="100%"
-      bottom="0px"
-      backgroundColor="rgba(206, 121, 7, 0.1)"
-      gap="$2"
-      padding="$2"
-      justifyContent="center"
-      alignItems="center"
-    >
-      <AlertTriangleIcon color="rgb(177, 87, 0)" size="$md" />
-      <StyledText fontSize="$sm" color="rgb(177, 87, 0)">
-        No internet connection.
-      </StyledText>
-    </XStack>
-  );
+  // Offline banner disabled
+  return null;
 }
 
 function PopupRouter() {

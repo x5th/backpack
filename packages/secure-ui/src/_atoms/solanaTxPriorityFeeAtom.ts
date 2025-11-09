@@ -71,29 +71,11 @@ export const solanaTxPriorityFeeAtom = selectorFamily<
  * @returns {Promise<number>}
  */
 async function _getPriorityFee(transaction: string): Promise<number> {
-  try {
-    const resp = await fetch(`${BACKEND_API_URL}/v2/graphql`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        query: `
-        query GetSolanaPriorityFee($transaction: String!) {
-          solanaPriorityFeeEstimate(transaction: $transaction)
-        }
-      `,
-        variables: {
-          transaction,
-        },
-        operationName: "GetSolanaPriorityFee",
-      }),
-    });
+  console.log("🔍 [_getPriorityFee] BACKEND_API_URL:", BACKEND_API_URL);
+  console.log("🔍 [_getPriorityFee] Would call:", `${BACKEND_API_URL}/v2/graphql`);
+  console.log("🔍 [_getPriorityFee] Skipping GraphQL query - returning 0");
 
-    const json = await resp.json();
-    return json.data?.solanaPriorityFeeEstimate ?? 0;
-  } catch {
-    return 0;
-  }
+  // Disabled: Priority fee estimation not needed
+  // Just return 0 immediately without making the GraphQL call
+  return 0;
 }

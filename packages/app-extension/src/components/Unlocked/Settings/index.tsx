@@ -20,11 +20,7 @@ import { Routes } from "../../../refactor/navigation/SettingsNavigator";
 import { AvatarHeader } from "./AvatarHeader/AvatarHeader";
 
 export function SettingsButton() {
-  return (
-    <div style={{ display: "flex" }}>
-      <SearchButton />
-    </div>
-  );
+  return null;
 }
 
 function SearchButton() {

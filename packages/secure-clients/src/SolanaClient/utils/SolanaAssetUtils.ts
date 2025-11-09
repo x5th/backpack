@@ -9,6 +9,8 @@ type GetAssetProofResponse = {
 export async function getAssetProof(
   assetId: string
 ): Promise<GetAssetProofResponse> {
+  console.log("🔍 [SolanaAssetUtils] BACKEND_API_URL:", BACKEND_API_URL);
+  console.log("🔍 [SolanaAssetUtils] Full URL:", `${BACKEND_API_URL}/v2/graphql`);
   const resp = await fetch(`${BACKEND_API_URL}/v2/graphql`, {
     method: "POST",
     headers: {
@@ -65,16 +67,19 @@ export type SolanaAsset =
 export async function getSolanaAssetById(
   assetId: string
 ): Promise<SolanaAsset> {
-  // Handle X1 native token - bypass GraphQL
-  if (assetId === "x1-native" || assetId.startsWith("TokenBalance:x1-native")) {
-    return {
-      __typename: "TokenBalance",
-      mint: "11111111111111111111111111111111",
-      fungibleAta: "11111111111111111111111111111111",
-      decimals: 9,
-    };
-  }
+  console.log("🔍 [getSolanaAssetById] BACKEND_API_URL:", BACKEND_API_URL);
+  console.log("🔍 [getSolanaAssetById] assetId:", assetId);
+  console.log("🔍 [getSolanaAssetById] Returning default response - skipping GraphQL");
 
+  // Always return default TokenBalance response - GraphQL query disabled
+  return {
+    __typename: "TokenBalance",
+    mint: "11111111111111111111111111111111",
+    fungibleAta: "11111111111111111111111111111111",
+    decimals: 9,
+  };
+
+  /* DISABLED - Original GraphQL query code
   const resp = await fetch(`${BACKEND_API_URL}/v2/graphql`, {
     method: "POST",
     headers: {
@@ -125,4 +130,5 @@ export async function getSolanaAssetById(
     ...json.data?.node,
     proofData: json.data?.assetProof,
   };
+  */
 }

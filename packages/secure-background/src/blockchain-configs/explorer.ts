@@ -151,6 +151,15 @@ function clusterSuffix(base: string, connectionUrl: string): string {
     case SolanaExplorer.SOLANA_FM:
     case SolanaExplorer.SOLANA_BEACH:
     case SolanaExplorer.XRAY:
+      // Check for QuickNode URLs and treat as their respective networks
+      if (connectionUrl.includes('solana-mainnet.quiknode.pro')) {
+        return "?cluster=mainnet";
+      } else if (connectionUrl.includes('solana-devnet')) {
+        return "?cluster=devnet";
+      } else if (connectionUrl.includes('solana-testnet')) {
+        return "?cluster=testnet";
+      }
+
       switch (connectionUrl) {
         case SolanaCluster.MAINNET:
           return "?cluster=mainnet";

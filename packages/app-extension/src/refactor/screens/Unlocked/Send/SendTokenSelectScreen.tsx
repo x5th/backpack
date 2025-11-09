@@ -3,6 +3,7 @@ import { Blockchain } from "@coral-xyz/common";
 import { useTranslation } from "@coral-xyz/i18n";
 import { EmptyState, WarningIcon } from "@coral-xyz/react-common";
 import { useActiveWallet, useBlockchainConnectionUrl } from "@coral-xyz/recoil";
+import { backendApiUrl } from "@coral-xyz/recoil/src/atoms/preferences";
 import {
   ETH_NATIVE_MINT,
   SOL_NATIVE_MINT,
@@ -14,6 +15,7 @@ import {
   XStack,
   YStack,
 } from "@coral-xyz/tamagui";
+import { useRecoilValue } from "recoil";
 
 import { SearchableTokenTable } from "../../../../components/common/TokenTable";
 import { ScreenContainer } from "../../../components/ScreenContainer";
@@ -33,6 +35,7 @@ export function SendTokenSelectScreen(props: SendTokenSelectScreenProps) {
 function Container({ navigation }: SendTokenSelectScreenProps) {
   const { blockchain, publicKey } = useActiveWallet();
   const connectionUrl = useBlockchainConnectionUrl(blockchain);
+  const apiUrl = useRecoilValue(backendApiUrl);
   const { t } = useTranslation();
   const [tokens, setTokens] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,18 +50,34 @@ function Container({ navigation }: SendTokenSelectScreenProps) {
         setLoading(true);
         setError(null);
 
-        // Determine the correct providerId for X1 blockchain
+        // Determine the correct providerId based on connection URL
+        // Since we treat Solana networks as RPC alternatives for X1 wallets,
+        // we need to detect the network from the URL, not the blockchain type
         let providerId = blockchain.toUpperCase();
-        if (blockchain === Blockchain.X1 && connectionUrl) {
-          if (connectionUrl.includes('testnet')) {
-            providerId = 'X1-testnet';
-          } else {
-            providerId = 'X1-mainnet';
+
+        if (connectionUrl) {
+          // Check for Solana networks first (including QuickNode)
+          if (connectionUrl.includes('solana.com') || connectionUrl.includes('solana-mainnet.quiknode.pro') || connectionUrl.includes('solana-devnet') || connectionUrl.includes('solana-testnet')) {
+            if (connectionUrl.includes('mainnet')) {
+              providerId = 'SOLANA-mainnet';
+            } else if (connectionUrl.includes('devnet')) {
+              providerId = 'SOLANA-devnet';
+            } else if (connectionUrl.includes('testnet')) {
+              providerId = 'SOLANA-testnet';
+            }
+          }
+          // Check for X1 networks
+          else if (connectionUrl.includes('x1.xyz')) {
+            if (connectionUrl.includes('testnet')) {
+              providerId = 'X1-testnet';
+            } else if (connectionUrl.includes('mainnet')) {
+              providerId = 'X1-mainnet';
+            }
           }
         }
 
-        const url = `http://162.250.126.66:4000/wallet/${publicKey}?providerId=${providerId}`;
-        console.log("🌐 [SendTokenSelect] Fetching from:", url);
+        const url = `${apiUrl}/wallet/${publicKey}?providerId=${providerId}`;
+        console.log("🌐 [SendTokenSelect] Fetching from:", url, "| ConnectionURL:", connectionUrl);
 
         const response = await fetch(url);
         console.log("📡 [SendTokenSelect] Response status:", response.status);
@@ -118,7 +137,7 @@ function Container({ navigation }: SendTokenSelectScreenProps) {
     if (publicKey) {
       fetchTokens();
     }
-  }, [publicKey, blockchain, connectionUrl]);
+  }, [publicKey, blockchain, connectionUrl, apiUrl]);
 
   if (loading) {
     console.log("🔍 [SendTokenSelect] Showing loading state");
