@@ -425,14 +425,53 @@ export default function App() {
           </TouchableOpacity>
         </View>
 
+        {/* Tokens/Activity Toggle Buttons */}
+        <View style={styles.viewToggle}>
+          <TouchableOpacity
+            style={[
+              styles.viewToggleButton,
+              activeTab === "tokens" && styles.viewToggleButtonActive,
+            ]}
+            onPress={() => setActiveTab("tokens")}
+          >
+            <Text
+              style={
+                activeTab === "tokens"
+                  ? styles.viewToggleTextActive
+                  : styles.viewToggleText
+              }
+            >
+              Tokens
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.viewToggleButton,
+              activeTab === "activity" && styles.viewToggleButtonActive,
+            ]}
+            onPress={() => setActiveTab("activity")}
+          >
+            <Text
+              style={
+                activeTab === "activity"
+                  ? styles.viewToggleTextActive
+                  : styles.viewToggleText
+              }
+            >
+              Activity
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Main Scrollable Content */}
-        <ScrollView
-          style={styles.mainContent}
-          contentContainerStyle={styles.mainContentContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Balance Section with all content */}
-          <View style={styles.balanceSection}>
+        {activeTab === "tokens" ? (
+          <ScrollView
+            style={styles.mainContent}
+            contentContainerStyle={styles.mainContentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Balance Section with all content */}
+            <View style={styles.balanceSection}>
             {/* Balance display */}
             <View style={styles.balanceContent}>
               <Text style={styles.balance}>{balance}</Text>
@@ -466,125 +505,94 @@ export default function App() {
               </TouchableOpacity>
             </View>
 
-            {/* Tabs */}
-            <View style={styles.tabs}>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === "tokens" && styles.tabActive]}
-                onPress={() => setActiveTab("tokens")}
-              >
-                <Text
-                  style={
-                    activeTab === "tokens"
-                      ? styles.tabTextActive
-                      : styles.tabText
-                  }
-                >
-                  Tokens
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.tab,
-                  activeTab === "activity" && styles.tabActive,
-                ]}
-                onPress={() => setActiveTab("activity")}
-              >
-                <Text
-                  style={
-                    activeTab === "activity"
-                      ? styles.tabTextActive
-                      : styles.tabText
-                  }
-                >
-                  Activity
-                </Text>
-              </TouchableOpacity>
+            {/* Token List */}
+            <View style={styles.tokenSection}>
+              {tokens.map((token) => {
+                const nativeToken = getNativeTokenInfo();
+                return (
+                  <View key={token.id} style={styles.tokenRow}>
+                    <View style={styles.tokenLeft}>
+                      <View style={styles.tokenIconLarge}>
+                        <Image
+                          source={nativeToken.logo}
+                          style={styles.x1LogoLarge}
+                        />
+                      </View>
+                      <View style={styles.tokenInfo}>
+                        <Text style={styles.tokenNameLarge}>
+                          {nativeToken.name}
+                        </Text>
+                        <Text style={styles.tokenBalanceSmall}>
+                          {token.balance} {nativeToken.symbol}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.tokenRight}>
+                      <Text style={styles.tokenUsdLarge}>
+                        ${token.usdValue}
+                      </Text>
+                      <Text style={styles.tokenChange}>+$0.00</Text>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
-
-            {/* Tab Content */}
-            {activeTab === "tokens" ? (
-              /* Tokens View */
-              <View style={styles.tokenSection}>
-                {tokens.map((token) => {
-                  const nativeToken = getNativeTokenInfo();
-                  return (
-                    <View key={token.id} style={styles.tokenRow}>
-                      <View style={styles.tokenLeft}>
-                        <View style={styles.tokenIconLarge}>
-                          <Image
-                            source={nativeToken.logo}
-                            style={styles.x1LogoLarge}
-                          />
-                        </View>
-                        <View style={styles.tokenInfo}>
-                          <Text style={styles.tokenNameLarge}>
-                            {nativeToken.name}
-                          </Text>
-                          <Text style={styles.tokenBalanceSmall}>
-                            {token.balance} {nativeToken.symbol}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.tokenRight}>
-                        <Text style={styles.tokenUsdLarge}>
-                          ${token.usdValue}
-                        </Text>
-                        <Text style={styles.tokenChange}>+$0.00</Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            ) : (
-              /* Activity View - Transactions List */
-              <View style={styles.transactionsList}>
-                {transactions.map((tx) => (
-                  <TouchableOpacity
-                    key={tx.id}
-                    style={styles.transactionRow}
-                    onPress={() => openExplorer(tx.signature)}
-                  >
-                    <View style={styles.transactionLeft}>
-                      <View
-                        style={[
-                          styles.transactionIcon,
-                          {
-                            backgroundColor:
-                              tx.type === "received" ? "#00D084" : "#FF6B6B",
-                          },
-                        ]}
-                      >
-                        <Text style={styles.transactionIconText}>
-                          {tx.type === "received" ? "▼" : "▲"}
-                        </Text>
-                      </View>
-                      <View style={styles.transactionInfo}>
-                        <Text style={styles.transactionType}>
-                          {tx.type === "received" ? "Received" : "Sent"}{" "}
-                          {tx.token}
-                        </Text>
-                        <Text style={styles.transactionTime}>
-                          {tx.timestamp}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text
+          </View>
+        </ScrollView>
+        ) : (
+          /* Activity View - Separate Screen */
+          <ScrollView
+            style={styles.mainContent}
+            contentContainerStyle={styles.activityContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.transactionsList}>
+              {transactions.map((tx) => (
+                <TouchableOpacity
+                  key={tx.id}
+                  style={styles.transactionRow}
+                  onPress={() => openExplorer(tx.signature)}
+                >
+                  <View style={styles.transactionLeft}>
+                    <View
                       style={[
-                        styles.transactionAmount,
+                        styles.transactionIcon,
                         {
-                          color: tx.type === "received" ? "#00D084" : "#FF6B6B",
+                          backgroundColor:
+                            tx.type === "received" ? "#00D084" : "#FF6B6B",
                         },
                       ]}
                     >
-                      {tx.type === "received" ? "+" : "-"}
-                      {tx.amount}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        </ScrollView>
+                      <Text style={styles.transactionIconText}>
+                        {tx.type === "received" ? "▼" : "▲"}
+                      </Text>
+                    </View>
+                    <View style={styles.transactionInfo}>
+                      <Text style={styles.transactionType}>
+                        {tx.type === "received" ? "Received" : "Sent"}{" "}
+                        {tx.token}
+                      </Text>
+                      <Text style={styles.transactionTime}>
+                        {tx.timestamp}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    style={[
+                      styles.transactionAmount,
+                      {
+                        color: tx.type === "received" ? "#00D084" : "#FF6B6B",
+                      },
+                    ]}
+                  >
+                    {tx.type === "received" ? "+" : "-"}
+                    {tx.amount}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        )}
 
         {/* Bottom Network Badge */}
         <View style={styles.bottomBadge}>
@@ -942,6 +950,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: "#000000",
+  },
+  viewToggle: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: "#000000",
+    gap: 16,
+  },
+  viewToggleButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  viewToggleButtonActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: "#4A90E2",
+  },
+  viewToggleText: {
+    color: "#999999",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  viewToggleTextActive: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  activityContainer: {
+    paddingTop: 0,
   },
   badge: {
     width: 32,
