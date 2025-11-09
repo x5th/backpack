@@ -954,7 +954,11 @@ export default function App() {
               </View>
 
               {/* Debug Logs */}
-              <ScrollView style={styles.debugLogList}>
+              <ScrollView
+                style={styles.debugLogList}
+                showsVerticalScrollIndicator={true}
+                nestedScrollEnabled={true}
+              >
                 {debugLogs.length === 0 ? (
                   <Text style={styles.debugNoLogs}>No logs yet...</Text>
                 ) : (
