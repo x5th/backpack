@@ -377,69 +377,64 @@ export default function App() {
         {/* Top Header with Safe Area */}
         <View style={styles.safeTopArea} />
         <View style={styles.topBar}>
+          {/* Wallet selector on the left */}
+          <View style={styles.walletSelectorLeft}>
+            <TouchableOpacity
+              style={styles.walletDropdownButton}
+              onPress={showWalletSelector}
+            >
+              <Image
+                source={require("./assets/x1.png")}
+                style={styles.x1LogoSmall}
+              />
+              <Text style={styles.walletDropdownText}>
+                {selectedWallet.name}
+              </Text>
+              <Text style={styles.walletDropdownArrow}>▼</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.copyButton}
+              onPress={copyAddress}
+            >
+              <Text style={styles.copyIcon}>⧉</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Network switch in the middle */}
+          <View style={styles.quickSwitchContainer}>
+            <TouchableOpacity
+              style={[
+                styles.quickSwitchButton,
+                currentNetwork.id === "X1" &&
+                  styles.quickSwitchButtonActive,
+              ]}
+              onPress={() => switchNetwork(NETWORKS[0])}
+            >
+              <Image
+                source={require("./assets/x1.png")}
+                style={styles.quickSwitchIcon}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.quickSwitchButton,
+                currentNetwork.id === "SOLANA" &&
+                  styles.quickSwitchButtonActive,
+              ]}
+              onPress={() => switchNetwork(NETWORKS[1])}
+            >
+              <Image
+                source={require("./assets/solana.png")}
+                style={styles.quickSwitchIcon}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Settings icon on the right */}
           <TouchableOpacity
-            style={[
-              styles.badge,
-              { backgroundColor: selectedAccount.badgeColor },
-            ]}
+            style={styles.settingsIcon}
             onPress={() => setShowSettingsDrawer(true)}
           >
-            <Text style={styles.badgeText}>{selectedAccount.badge}</Text>
-          </TouchableOpacity>
-          <View style={styles.topBarCenter}>
-            <View style={styles.walletDropdown}>
-              <View style={styles.walletDropdownRow}>
-                <TouchableOpacity
-                  style={styles.walletDropdownButton}
-                  onPress={showWalletSelector}
-                >
-                  <Image
-                    source={require("./assets/x1.png")}
-                    style={styles.x1LogoSmall}
-                  />
-                  <Text style={styles.walletDropdownText}>
-                    {selectedWallet.name}
-                  </Text>
-                  <Text style={styles.walletDropdownArrow}>▼</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.copyButton}
-                  onPress={copyAddress}
-                >
-                  <Text style={styles.copyIcon}>⧉</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.quickSwitchContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.quickSwitchButton,
-                    currentNetwork.id === "X1" &&
-                      styles.quickSwitchButtonActive,
-                  ]}
-                  onPress={() => switchNetwork(NETWORKS[0])}
-                >
-                  <Image
-                    source={require("./assets/x1.png")}
-                    style={styles.quickSwitchIcon}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.quickSwitchButton,
-                    currentNetwork.id === "SOLANA" &&
-                      styles.quickSwitchButtonActive,
-                  ]}
-                  onPress={() => switchNetwork(NETWORKS[1])}
-                >
-                  <Image
-                    source={require("./assets/solana.png")}
-                    style={styles.quickSwitchIcon}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.settingsIcon}>
             <Text style={styles.settingsIconText}>⚙</Text>
           </TouchableOpacity>
         </View>
@@ -1126,9 +1121,15 @@ const styles = StyleSheet.create({
   mainContentContainer: {
     paddingBottom: 80,
   },
+  walletSelectorLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   balanceSection: {
     paddingHorizontal: 20,
     paddingTop: 20,
+    backgroundColor: "#000000",
   },
   balanceContent: {
     alignItems: "center",
