@@ -215,7 +215,7 @@ export default function App() {
           maximumFractionDigits: 2,
         });
         const usdStr = data.tokens[0]?.valueUSD
-          ? `${data.tokens[0].valueUSD.toLocaleString("en-US", {
+          ? `$${data.tokens[0].valueUSD.toLocaleString("en-US", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}`
@@ -387,6 +387,10 @@ export default function App() {
     Alert.alert("Swap", "Swap functionality would open here");
   };
 
+  const handleStake = () => {
+    Alert.alert("Stake", "Stake functionality would open here");
+  };
+
   const handleBridge = () => {
     Alert.alert("Bridge", "Bridge functionality would open here");
   };
@@ -507,10 +511,6 @@ export default function App() {
           <View style={styles.balanceSection}>
             {/* Balance display */}
             <View style={styles.balanceContent}>
-              <Text style={styles.balance}>{balance}</Text>
-              <Text style={styles.balanceLabel}>
-                {getNativeTokenInfo().symbol}
-              </Text>
               <Text style={styles.balanceUSD}>{balanceUSD}</Text>
               <Text style={styles.balanceChange}>$0.00 0%</Text>
             </View>
@@ -535,6 +535,26 @@ export default function App() {
                   <Text style={styles.actionCircleIcon}>▲</Text>
                 </View>
                 <Text style={styles.actionCircleText}>Send</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionCircle}
+                onPress={handleSwap}
+              >
+                <View style={styles.actionCircleBg}>
+                  <Text style={styles.actionCircleIcon}>⇄</Text>
+                </View>
+                <Text style={styles.actionCircleText}>Swap</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionCircle}
+                onPress={handleStake}
+              >
+                <View style={styles.actionCircleBg}>
+                  <Text style={styles.actionCircleIcon}>◈</Text>
+                </View>
+                <Text style={styles.actionCircleText}>Stake</Text>
               </TouchableOpacity>
             </View>
 
@@ -1462,13 +1482,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   balanceUSD: {
-    fontSize: 18,
+    fontSize: 48,
+    fontWeight: "bold",
     color: "#FFFFFF",
     marginBottom: 4,
   },
   balanceChange: {
     fontSize: 14,
-    color: "#00D084",
+    color: "#888888",
   },
   actionsRow: {
     flexDirection: "row",
