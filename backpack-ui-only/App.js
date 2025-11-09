@@ -1394,6 +1394,7 @@ const styles = StyleSheet.create({
   bottomSheetContent: {
     flex: 1,
     paddingHorizontal: 20,
+    backgroundColor: "#000000",
   },
   bottomSheetHeader: {
     flexDirection: "row",
