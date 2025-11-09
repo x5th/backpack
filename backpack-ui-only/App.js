@@ -391,12 +391,6 @@ export default function App() {
               </Text>
               <Text style={styles.walletDropdownArrow}>▼</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.copyButton}
-              onPress={copyAddress}
-            >
-              <Text style={styles.copyIcon}>⧉</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Network switch in the middle */}
@@ -984,7 +978,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginHorizontal: 16,
-    marginTop: 12,
+    marginTop: 8,
   },
   activityCardHeader: {
     flexDirection: "row",
