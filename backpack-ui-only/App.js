@@ -244,17 +244,28 @@ export default function App() {
 
       if (data && data.transactions) {
         const formattedTransactions = data.transactions.map((tx) => {
-          const date = tx.timestamp ? new Date(tx.timestamp * 1000) : new Date();
+          // Handle both Unix timestamp (number) and ISO string formats
+          let date;
+          if (typeof tx.timestamp === 'string') {
+            date = new Date(tx.timestamp);
+          } else if (typeof tx.timestamp === 'number') {
+            date = new Date(tx.timestamp * 1000);
+          } else {
+            date = new Date();
+          }
           const isValidDate = !isNaN(date.getTime());
 
+          // Parse amount - could be string or number
+          const amountNum = typeof tx.amount === 'string' ? parseFloat(tx.amount) : (tx.amount || 0);
+
           return {
-            id: tx.signature,
-            type: tx.type || "transfer",
-            amount: (tx.amount || 0).toLocaleString("en-US", {
+            id: tx.hash || tx.signature,
+            type: tx.type === "SEND" ? "sent" : "received",
+            amount: amountNum.toLocaleString("en-US", {
               minimumFractionDigits: 2,
-              maximumFractionDigits: 5,
+              maximumFractionDigits: 9,
             }),
-            token: tx.symbol || getNativeTokenInfo().symbol,
+            token: tx.tokenSymbol || tx.symbol || getNativeTokenInfo().symbol,
             timestamp: isValidDate
               ? date.toLocaleTimeString("en-US", {
                   hour: "numeric",
@@ -262,8 +273,8 @@ export default function App() {
                   hour12: true,
                 })
               : "Unknown",
-            fee: tx.fee ? tx.fee.toFixed(9) : "0.000001650",
-            signature: tx.signature,
+            fee: tx.fee || "0.000001650",
+            signature: tx.hash || tx.signature,
           };
         });
 
@@ -442,13 +453,7 @@ export default function App() {
             ]}
             onPress={() => setActiveTab("tokens")}
           >
-            <Text
-              style={
-                activeTab === "tokens"
-                  ? styles.viewToggleTextActive
-                  : styles.viewToggleText
-              }
-            >
+            <Text style={styles.viewToggleText}>
               Tokens
             </Text>
           </TouchableOpacity>
@@ -459,13 +464,7 @@ export default function App() {
             ]}
             onPress={() => setActiveTab("activity")}
           >
-            <Text
-              style={
-                activeTab === "activity"
-                  ? styles.viewToggleTextActive
-                  : styles.viewToggleText
-              }
-            >
+            <Text style={styles.viewToggleText}>
               Activity
             </Text>
           </TouchableOpacity>
