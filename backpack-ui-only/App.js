@@ -586,21 +586,6 @@ export default function App() {
           </ScrollView>
         )}
 
-        {/* Bottom Network Badge */}
-        <View style={styles.bottomBadge}>
-          <TouchableOpacity
-            onPress={showNetworkSelector}
-            style={styles.bottomBadgeButton}
-          >
-            <Image
-              source={currentNetwork.logo}
-              style={styles.networkBadgeIcon}
-            />
-            <Text style={styles.bottomBadgeText}>
-              {currentNetwork.name.toUpperCase()}
-            </Text>
-          </TouchableOpacity>
-        </View>
       </SafeAreaView>
 
       {/* Network Selector Side Drawer */}
