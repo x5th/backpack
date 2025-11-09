@@ -971,7 +971,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   viewToggleButtonActive: {
-    backgroundColor: "#4A90E2",
+    backgroundColor: "#1e3a5f",
   },
   viewToggleText: {
     color: "#999999",
@@ -988,39 +988,39 @@ const styles = StyleSheet.create({
   },
   activityCard: {
     backgroundColor: "#0a0a0a",
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 8,
+    padding: 12,
     marginHorizontal: 16,
-    marginTop: 16,
+    marginTop: 12,
   },
   activityCardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 8,
   },
   activityCardTitle: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
   },
   activityCardTime: {
     color: "#999999",
-    fontSize: 14,
+    fontSize: 13,
   },
   activityCardRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 4,
   },
   activityCardLabel: {
     color: "#999999",
-    fontSize: 14,
+    fontSize: 13,
   },
   activityCardValue: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
   },
   badge: {
