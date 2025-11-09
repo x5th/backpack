@@ -142,7 +142,6 @@ export default function App() {
   const [transactions, setTransactions] = useState([]);
   const [balanceCache, setBalanceCache] = useState({});
   const [currentNetwork, setCurrentNetwork] = useState(NETWORKS[0]);
-  const [activeTab, setActiveTab] = useState("tokens"); // 'tokens' or 'activity'
 
   // Network selector states
   const [showNetworkDrawer, setShowNetworkDrawer] = useState(false);
@@ -150,6 +149,7 @@ export default function App() {
   const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
   const [showDebugDrawer, setShowDebugDrawer] = useState(false);
   const [debugLogs, setDebugLogs] = useState([]);
+  const [showActivityDrawer, setShowActivityDrawer] = useState(false);
 
   // Send and Receive states
   const [showReceiveDrawer, setShowReceiveDrawer] = useState(false);
@@ -471,44 +471,29 @@ export default function App() {
             </TouchableOpacity>
           </View>
 
-          {/* Settings icon on the right */}
-          <TouchableOpacity
-            style={styles.settingsIcon}
-            onPress={() => setShowSettingsDrawer(true)}
-          >
-            <Text style={styles.settingsIconText}>⚙</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Tokens/Activity Toggle Buttons */}
-        <View style={styles.viewToggle}>
-          <TouchableOpacity
-            style={[
-              styles.viewToggleButton,
-              activeTab === "tokens" && styles.viewToggleButtonActive,
-            ]}
-            onPress={() => setActiveTab("tokens")}
-          >
-            <Text style={styles.viewToggleText}>Tokens</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.viewToggleButton,
-              activeTab === "activity" && styles.viewToggleButtonActive,
-            ]}
-            onPress={() => setActiveTab("activity")}
-          >
-            <Text style={styles.viewToggleText}>Activity</Text>
-          </TouchableOpacity>
+          {/* Activity and Settings icons on the right */}
+          <View style={styles.topBarRightIcons}>
+            <TouchableOpacity
+              style={styles.activityIcon}
+              onPress={() => setShowActivityDrawer(true)}
+            >
+              <Text style={styles.activityIconText}>🕐</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.settingsIcon}
+              onPress={() => setShowSettingsDrawer(true)}
+            >
+              <Text style={styles.settingsIconText}>⚙</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Main Scrollable Content */}
-        {activeTab === "tokens" ? (
-          <ScrollView
-            style={styles.mainContent}
-            contentContainerStyle={styles.mainContentContainer}
-            showsVerticalScrollIndicator={false}
-          >
+        <ScrollView
+          style={styles.mainContent}
+          contentContainerStyle={styles.mainContentContainer}
+          showsVerticalScrollIndicator={false}
+        >
             {/* Balance Section with all content */}
             <View style={styles.balanceSection}>
               {/* Balance display */}
@@ -577,56 +562,7 @@ export default function App() {
                 })}
               </View>
             </View>
-          </ScrollView>
-        ) : (
-          <ScrollView
-            style={styles.mainContent}
-            contentContainerStyle={styles.activityContainer}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.transactionsList}>
-              {transactions.map((tx) => (
-                <TouchableOpacity
-                  key={tx.id}
-                  style={styles.activityCard}
-                  onPress={() => openExplorer(tx.signature)}
-                >
-                  {/* Header with title and time */}
-                  <View style={styles.activityCardHeader}>
-                    <Text style={styles.activityCardTitle}>
-                      {tx.type === "received" ? "Received" : "Sent"} {tx.token}
-                    </Text>
-                    <Text style={styles.activityCardTime}>{tx.timestamp}</Text>
-                  </View>
-
-                  {/* Amount row */}
-                  <View style={styles.activityCardRow}>
-                    <Text style={styles.activityCardLabel}>Amount</Text>
-                    <Text
-                      style={[
-                        styles.activityCardValue,
-                        {
-                          color: tx.type === "received" ? "#00D084" : "#FF6B6B",
-                        },
-                      ]}
-                    >
-                      {tx.type === "received" ? "+" : "-"}
-                      {tx.amount} {tx.token}
-                    </Text>
-                  </View>
-
-                  {/* Fee row */}
-                  <View style={styles.activityCardRow}>
-                    <Text style={styles.activityCardLabel}>Fee</Text>
-                    <Text style={styles.activityCardValue}>
-                      {tx.fee || "0.000001650"} {tx.token}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-        )}
+        </ScrollView>
       </SafeAreaView>
 
       {/* Network Selector Side Drawer */}
@@ -1185,6 +1121,73 @@ export default function App() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Activity Modal */}
+      <Modal
+        visible={showActivityDrawer}
+        transparent={false}
+        animationType="slide"
+        onRequestClose={() => setShowActivityDrawer(false)}
+      >
+        <SafeAreaView style={styles.activityModalContainer}>
+          {/* Header with Close button */}
+          <View style={styles.activityModalHeader}>
+            <Text style={styles.activityModalTitle}>Activity</Text>
+            <TouchableOpacity onPress={() => setShowActivityDrawer(false)}>
+              <Text style={styles.activityModalClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Activity List */}
+          <ScrollView
+            style={styles.activityModalContent}
+            contentContainerStyle={styles.activityContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.transactionsList}>
+              {transactions.map((tx) => (
+                <TouchableOpacity
+                  key={tx.id}
+                  style={styles.activityCard}
+                  onPress={() => openExplorer(tx.signature)}
+                >
+                  {/* Header with title and time */}
+                  <View style={styles.activityCardHeader}>
+                    <Text style={styles.activityCardTitle}>
+                      {tx.type === "received" ? "Received" : "Sent"} {tx.token}
+                    </Text>
+                    <Text style={styles.activityCardTime}>{tx.timestamp}</Text>
+                  </View>
+
+                  {/* Amount row */}
+                  <View style={styles.activityCardRow}>
+                    <Text style={styles.activityCardLabel}>Amount</Text>
+                    <Text
+                      style={[
+                        styles.activityCardValue,
+                        {
+                          color: tx.type === "received" ? "#00D084" : "#FF6B6B",
+                        },
+                      ]}
+                    >
+                      {tx.type === "received" ? "+" : "-"}
+                      {tx.amount} {tx.token}
+                    </Text>
+                  </View>
+
+                  {/* Fee row */}
+                  <View style={styles.activityCardRow}>
+                    <Text style={styles.activityCardLabel}>Fee</Text>
+                    <Text style={styles.activityCardValue}>
+                      {tx.fee || "0.000001650"} {tx.token}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </GestureHandlerRootView>
   );
 }
@@ -1357,13 +1360,28 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
   },
+  topBarRightIcons: {
+    position: "absolute",
+    right: 16,
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "center",
+  },
+  activityIcon: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  activityIconText: {
+    fontSize: 20,
+    color: "#999999",
+  },
   settingsIcon: {
     width: 32,
     height: 32,
     justifyContent: "center",
     alignItems: "center",
-    position: "absolute",
-    right: 16,
   },
   settingsIconText: {
     fontSize: 20,
@@ -2090,5 +2108,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#888888",
     fontFamily: "monospace",
+  },
+  // Activity Modal Styles
+  activityModalContainer: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  activityModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: "#000000",
+    borderBottomWidth: 1,
+    borderBottomColor: "#1a1a1a",
+  },
+  activityModalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
+  activityModalClose: {
+    fontSize: 28,
+    color: "#888888",
+  },
+  activityModalContent: {
+    flex: 1,
+    paddingHorizontal: 16,
   },
 });
