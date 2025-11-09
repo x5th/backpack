@@ -674,7 +674,12 @@ export default function App() {
             <TouchableOpacity onPress={() => bottomSheetRef.current?.close()}>
               <Text style={styles.bottomSheetClose}>✕</Text>
             </TouchableOpacity>
-            <Text style={styles.bottomSheetTitle}>Wallets</Text>
+            <View style={styles.bottomSheetTitleContainer}>
+              <Text style={styles.bottomSheetTitle}>Wallets</Text>
+              <Text style={styles.bottomSheetNetworkBadge}>
+                {currentNetwork.name}
+              </Text>
+            </View>
             <TouchableOpacity>
               <Text style={styles.bottomSheetAdd}>+</Text>
             </TouchableOpacity>
@@ -730,12 +735,6 @@ export default function App() {
             </TouchableOpacity>
           </ScrollView>
 
-          {/* Bottom Badge */}
-          <View style={styles.bottomSheetFooter}>
-            <Text style={styles.bottomSheetFooterText}>
-              {currentNetwork.name.toUpperCase()}
-            </Text>
-          </View>
         </BottomSheetView>
       </BottomSheet>
 
@@ -1406,10 +1405,18 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: "#888888",
   },
+  bottomSheetTitleContainer: {
+    alignItems: "center",
+  },
   bottomSheetTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#FFFFFF",
+  },
+  bottomSheetNetworkBadge: {
+    fontSize: 11,
+    color: "#888888",
+    marginTop: 2,
   },
   bottomSheetAdd: {
     fontSize: 28,
