@@ -243,21 +243,29 @@ export default function App() {
       const data = await response.json();
 
       if (data && data.transactions) {
-        const formattedTransactions = data.transactions.map((tx) => ({
-          id: tx.signature,
-          type: tx.type || "transfer",
-          amount: (tx.amount || 0).toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 5,
-          }),
-          token: tx.symbol || getNativeTokenInfo().symbol,
-          timestamp: new Date(tx.timestamp * 1000).toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-          }),
-          signature: tx.signature,
-        }));
+        const formattedTransactions = data.transactions.map((tx) => {
+          const date = tx.timestamp ? new Date(tx.timestamp * 1000) : new Date();
+          const isValidDate = !isNaN(date.getTime());
+
+          return {
+            id: tx.signature,
+            type: tx.type || "transfer",
+            amount: (tx.amount || 0).toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 5,
+            }),
+            token: tx.symbol || getNativeTokenInfo().symbol,
+            timestamp: isValidDate
+              ? date.toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+                })
+              : "Unknown",
+            fee: tx.fee ? tx.fee.toFixed(9) : "0.000001650",
+            signature: tx.signature,
+          };
+        });
 
         setTransactions(formattedTransactions);
       }
@@ -472,75 +480,74 @@ export default function App() {
           >
             {/* Balance Section with all content */}
             <View style={styles.balanceSection}>
-            {/* Balance display */}
-            <View style={styles.balanceContent}>
-              <Text style={styles.balance}>{balance}</Text>
-              <Text style={styles.balanceLabel}>
-                {getNativeTokenInfo().symbol}
-              </Text>
-              <Text style={styles.balanceUSD}>{balanceUSD}</Text>
-              <Text style={styles.balanceChange}>$0.00 0%</Text>
-            </View>
+              {/* Balance display */}
+              <View style={styles.balanceContent}>
+                <Text style={styles.balance}>{balance}</Text>
+                <Text style={styles.balanceLabel}>
+                  {getNativeTokenInfo().symbol}
+                </Text>
+                <Text style={styles.balanceUSD}>{balanceUSD}</Text>
+                <Text style={styles.balanceChange}>$0.00 0%</Text>
+              </View>
 
-            {/* Action Buttons */}
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={styles.actionCircle}
-                onPress={handleReceive}
-              >
-                <View style={styles.actionCircleBg}>
-                  <Text style={styles.actionCircleIcon}>▼</Text>
-                </View>
-                <Text style={styles.actionCircleText}>Receive</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionCircle}
-                onPress={handleSend}
-              >
-                <View style={styles.actionCircleBg}>
-                  <Text style={styles.actionCircleIcon}>▲</Text>
-                </View>
-                <Text style={styles.actionCircleText}>Send</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Token List */}
-            <View style={styles.tokenSection}>
-              {tokens.map((token) => {
-                const nativeToken = getNativeTokenInfo();
-                return (
-                  <View key={token.id} style={styles.tokenRow}>
-                    <View style={styles.tokenLeft}>
-                      <View style={styles.tokenIconLarge}>
-                        <Image
-                          source={nativeToken.logo}
-                          style={styles.x1LogoLarge}
-                        />
-                      </View>
-                      <View style={styles.tokenInfo}>
-                        <Text style={styles.tokenNameLarge}>
-                          {nativeToken.name}
-                        </Text>
-                        <Text style={styles.tokenBalanceSmall}>
-                          {token.balance} {nativeToken.symbol}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.tokenRight}>
-                      <Text style={styles.tokenUsdLarge}>
-                        ${token.usdValue}
-                      </Text>
-                      <Text style={styles.tokenChange}>+$0.00</Text>
-                    </View>
+              {/* Action Buttons */}
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={styles.actionCircle}
+                  onPress={handleReceive}
+                >
+                  <View style={styles.actionCircleBg}>
+                    <Text style={styles.actionCircleIcon}>▼</Text>
                   </View>
-                );
-              })}
+                  <Text style={styles.actionCircleText}>Receive</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionCircle}
+                  onPress={handleSend}
+                >
+                  <View style={styles.actionCircleBg}>
+                    <Text style={styles.actionCircleIcon}>▲</Text>
+                  </View>
+                  <Text style={styles.actionCircleText}>Send</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Token List */}
+              <View style={styles.tokenSection}>
+                {tokens.map((token) => {
+                  const nativeToken = getNativeTokenInfo();
+                  return (
+                    <View key={token.id} style={styles.tokenRow}>
+                      <View style={styles.tokenLeft}>
+                        <View style={styles.tokenIconLarge}>
+                          <Image
+                            source={nativeToken.logo}
+                            style={styles.x1LogoLarge}
+                          />
+                        </View>
+                        <View style={styles.tokenInfo}>
+                          <Text style={styles.tokenNameLarge}>
+                            {nativeToken.name}
+                          </Text>
+                          <Text style={styles.tokenBalanceSmall}>
+                            {token.balance} {nativeToken.symbol}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.tokenRight}>
+                        <Text style={styles.tokenUsdLarge}>
+                          ${token.usdValue}
+                        </Text>
+                        <Text style={styles.tokenChange}>+$0.00</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
             </View>
-          </View>
         </ScrollView>
         ) : (
-          /* Activity View - Separate Screen */
           <ScrollView
             style={styles.mainContent}
             contentContainerStyle={styles.activityContainer}
@@ -550,44 +557,42 @@ export default function App() {
               {transactions.map((tx) => (
                 <TouchableOpacity
                   key={tx.id}
-                  style={styles.transactionRow}
+                  style={styles.activityCard}
                   onPress={() => openExplorer(tx.signature)}
                 >
-                  <View style={styles.transactionLeft}>
-                    <View
+                  {/* Header with title and time */}
+                  <View style={styles.activityCardHeader}>
+                    <Text style={styles.activityCardTitle}>
+                      {tx.type === "received" ? "Received" : "Sent"} {tx.token}
+                    </Text>
+                    <Text style={styles.activityCardTime}>
+                      {tx.timestamp}
+                    </Text>
+                  </View>
+
+                  {/* Amount row */}
+                  <View style={styles.activityCardRow}>
+                    <Text style={styles.activityCardLabel}>Amount</Text>
+                    <Text
                       style={[
-                        styles.transactionIcon,
+                        styles.activityCardValue,
                         {
-                          backgroundColor:
-                            tx.type === "received" ? "#00D084" : "#FF6B6B",
+                          color: tx.type === "received" ? "#00D084" : "#FF6B6B",
                         },
                       ]}
                     >
-                      <Text style={styles.transactionIconText}>
-                        {tx.type === "received" ? "▼" : "▲"}
-                      </Text>
-                    </View>
-                    <View style={styles.transactionInfo}>
-                      <Text style={styles.transactionType}>
-                        {tx.type === "received" ? "Received" : "Sent"}{" "}
-                        {tx.token}
-                      </Text>
-                      <Text style={styles.transactionTime}>
-                        {tx.timestamp}
-                      </Text>
-                    </View>
+                      {tx.type === "received" ? "+" : "-"}
+                      {tx.amount} {tx.token}
+                    </Text>
                   </View>
-                  <Text
-                    style={[
-                      styles.transactionAmount,
-                      {
-                        color: tx.type === "received" ? "#00D084" : "#FF6B6B",
-                      },
-                    ]}
-                  >
-                    {tx.type === "received" ? "+" : "-"}
-                    {tx.amount}
-                  </Text>
+
+                  {/* Fee row */}
+                  <View style={styles.activityCardRow}>
+                    <Text style={styles.activityCardLabel}>Fee</Text>
+                    <Text style={styles.activityCardValue}>
+                      {tx.fee || "0.000001650"} {tx.token}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
@@ -957,14 +962,16 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: "#000000",
     gap: 16,
+    justifyContent: "center",
+    alignItems: "center",
   },
   viewToggleButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 6,
   },
   viewToggleButtonActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: "#4A90E2",
+    backgroundColor: "#4A90E2",
   },
   viewToggleText: {
     color: "#999999",
@@ -978,6 +985,43 @@ const styles = StyleSheet.create({
   },
   activityContainer: {
     paddingTop: 0,
+  },
+  activityCard: {
+    backgroundColor: "#0a0a0a",
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+  },
+  activityCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  activityCardTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  activityCardTime: {
+    color: "#999999",
+    fontSize: 14,
+  },
+  activityCardRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  activityCardLabel: {
+    color: "#999999",
+    fontSize: 14,
+  },
+  activityCardValue: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "500",
   },
   badge: {
     width: 32,
@@ -1331,7 +1375,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   networkItemSelected: {
-    backgroundColor: "#2a2a2a",
     borderWidth: 1,
     borderColor: "#4A90E2",
   },
