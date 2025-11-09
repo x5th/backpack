@@ -23,6 +23,7 @@ import {
   Modal,
   Pressable,
   Linking,
+  Clipboard,
 } from "react-native";
 import { Keypair, Connection, clusterApiUrl } from "@solana/web3.js";
 import * as bip39 from "bip39";
@@ -139,6 +140,7 @@ export default function App() {
   const [transactions, setTransactions] = useState([]);
   const [balanceCache, setBalanceCache] = useState({});
   const [currentNetwork, setCurrentNetwork] = useState(NETWORKS[0]);
+  const [activeTab, setActiveTab] = useState("tokens"); // 'tokens' or 'activity'
 
   // Network selector states
   const [showNetworkDrawer, setShowNetworkDrawer] = useState(false);
@@ -318,6 +320,10 @@ export default function App() {
     Alert.alert("Bridge", "Bridge functionality would open here");
   };
 
+  const copyAddress = () => {
+    Clipboard.setString(selectedWallet.publicKey);
+  };
+
   const handleSheetChanges = useCallback((index) => {
     console.log("handleSheetChanges", index);
   }, []);
@@ -363,19 +369,27 @@ export default function App() {
           </TouchableOpacity>
           <View style={styles.topBarCenter}>
             <View style={styles.walletDropdown}>
-              <TouchableOpacity
-                style={styles.walletDropdownButton}
-                onPress={showWalletSelector}
-              >
-                <Image
-                  source={require("./assets/x1.png")}
-                  style={styles.x1LogoSmall}
-                />
-                <Text style={styles.walletDropdownText}>
-                  {selectedWallet.name}
-                </Text>
-                <Text style={styles.walletDropdownArrow}>▼</Text>
-              </TouchableOpacity>
+              <View style={styles.walletDropdownRow}>
+                <TouchableOpacity
+                  style={styles.walletDropdownButton}
+                  onPress={showWalletSelector}
+                >
+                  <Image
+                    source={require("./assets/x1.png")}
+                    style={styles.x1LogoSmall}
+                  />
+                  <Text style={styles.walletDropdownText}>
+                    {selectedWallet.name}
+                  </Text>
+                  <Text style={styles.walletDropdownArrow}>▼</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.copyButton}
+                  onPress={copyAddress}
+                >
+                  <Text style={styles.copyIcon}>⧉</Text>
+                </TouchableOpacity>
+              </View>
               <View style={styles.quickSwitchContainer}>
                 <TouchableOpacity
                   style={[
@@ -452,91 +466,123 @@ export default function App() {
               </TouchableOpacity>
             </View>
 
-            {/* Token List */}
-            <View style={styles.tokenSection}>
-              {tokens.map((token) => {
-                const nativeToken = getNativeTokenInfo();
-                return (
-                  <View key={token.id} style={styles.tokenRow}>
-                    <View style={styles.tokenLeft}>
-                      <View style={styles.tokenIconLarge}>
-                        <Image
-                          source={nativeToken.logo}
-                          style={styles.x1LogoLarge}
-                        />
-                      </View>
-                      <View style={styles.tokenInfo}>
-                        <Text style={styles.tokenNameLarge}>
-                          {nativeToken.name}
-                        </Text>
-                        <Text style={styles.tokenBalanceSmall}>
-                          {token.balance} {nativeToken.symbol}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.tokenRight}>
-                      <Text style={styles.tokenUsdLarge}>
-                        ${token.usdValue}
-                      </Text>
-                      <Text style={styles.tokenChange}>+$0.00</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-
             {/* Tabs */}
             <View style={styles.tabs}>
-              <TouchableOpacity style={[styles.tab, styles.tabActive]}>
-                <Text style={styles.tabTextActive}>Activity</Text>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === "tokens" && styles.tabActive]}
+                onPress={() => setActiveTab("tokens")}
+              >
+                <Text
+                  style={
+                    activeTab === "tokens"
+                      ? styles.tabTextActive
+                      : styles.tabText
+                  }
+                >
+                  Tokens
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.tab}>
-                <Text style={styles.tabText}>Collectibles</Text>
+              <TouchableOpacity
+                style={[
+                  styles.tab,
+                  activeTab === "activity" && styles.tabActive,
+                ]}
+                onPress={() => setActiveTab("activity")}
+              >
+                <Text
+                  style={
+                    activeTab === "activity"
+                      ? styles.tabTextActive
+                      : styles.tabText
+                  }
+                >
+                  Activity
+                </Text>
               </TouchableOpacity>
             </View>
 
-            {/* Transactions List */}
-            <View style={styles.transactionsList}>
-              {transactions.map((tx) => (
-                <TouchableOpacity
-                  key={tx.id}
-                  style={styles.transactionRow}
-                  onPress={() => openExplorer(tx.signature)}
-                >
-                  <View style={styles.transactionLeft}>
-                    <View
+            {/* Tab Content */}
+            {activeTab === "tokens" ? (
+              /* Tokens View */
+              <View style={styles.tokenSection}>
+                {tokens.map((token) => {
+                  const nativeToken = getNativeTokenInfo();
+                  return (
+                    <View key={token.id} style={styles.tokenRow}>
+                      <View style={styles.tokenLeft}>
+                        <View style={styles.tokenIconLarge}>
+                          <Image
+                            source={nativeToken.logo}
+                            style={styles.x1LogoLarge}
+                          />
+                        </View>
+                        <View style={styles.tokenInfo}>
+                          <Text style={styles.tokenNameLarge}>
+                            {nativeToken.name}
+                          </Text>
+                          <Text style={styles.tokenBalanceSmall}>
+                            {token.balance} {nativeToken.symbol}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.tokenRight}>
+                        <Text style={styles.tokenUsdLarge}>
+                          ${token.usdValue}
+                        </Text>
+                        <Text style={styles.tokenChange}>+$0.00</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : (
+              /* Activity View - Transactions List */
+              <View style={styles.transactionsList}>
+                {transactions.map((tx) => (
+                  <TouchableOpacity
+                    key={tx.id}
+                    style={styles.transactionRow}
+                    onPress={() => openExplorer(tx.signature)}
+                  >
+                    <View style={styles.transactionLeft}>
+                      <View
+                        style={[
+                          styles.transactionIcon,
+                          {
+                            backgroundColor:
+                              tx.type === "received" ? "#00D084" : "#FF6B6B",
+                          },
+                        ]}
+                      >
+                        <Text style={styles.transactionIconText}>
+                          {tx.type === "received" ? "▼" : "▲"}
+                        </Text>
+                      </View>
+                      <View style={styles.transactionInfo}>
+                        <Text style={styles.transactionType}>
+                          {tx.type === "received" ? "Received" : "Sent"}{" "}
+                          {tx.token}
+                        </Text>
+                        <Text style={styles.transactionTime}>
+                          {tx.timestamp}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text
                       style={[
-                        styles.transactionIcon,
+                        styles.transactionAmount,
                         {
-                          backgroundColor:
-                            tx.type === "received" ? "#00D084" : "#FF6B6B",
+                          color: tx.type === "received" ? "#00D084" : "#FF6B6B",
                         },
                       ]}
                     >
-                      <Text style={styles.transactionIconText}>
-                        {tx.type === "received" ? "▼" : "▲"}
-                      </Text>
-                    </View>
-                    <View style={styles.transactionInfo}>
-                      <Text style={styles.transactionType}>
-                        {tx.type === "received" ? "Received" : "Sent"}{" "}
-                        {tx.token}
-                      </Text>
-                      <Text style={styles.transactionTime}>{tx.timestamp}</Text>
-                    </View>
-                  </View>
-                  <Text
-                    style={[
-                      styles.transactionAmount,
-                      { color: tx.type === "received" ? "#00D084" : "#FF6B6B" },
-                    ]}
-                  >
-                    {tx.type === "received" ? "+" : "-"}
-                    {tx.amount}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                      {tx.type === "received" ? "+" : "-"}
+                      {tx.amount}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
         </ScrollView>
 
@@ -887,7 +933,7 @@ const styles = StyleSheet.create({
   },
   safeTopArea: {
     backgroundColor: "#000000",
-    height: 0,
+    height: 40,
   },
   topBar: {
     flexDirection: "row",
@@ -921,6 +967,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  walletDropdownRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   walletDropdownButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -937,6 +988,20 @@ const styles = StyleSheet.create({
   walletDropdownArrow: {
     color: "#FFFFFF",
     fontSize: 10,
+  },
+  copyButton: {
+    width: 28,
+    height: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 14,
+    backgroundColor: "#1a1a1a",
+    borderWidth: 1,
+    borderColor: "#333333",
+  },
+  copyIcon: {
+    color: "#FFFFFF",
+    fontSize: 14,
   },
   quickSwitchContainer: {
     flexDirection: "row",
