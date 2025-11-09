@@ -146,10 +146,30 @@ export default function App() {
   const [showNetworkDrawer, setShowNetworkDrawer] = useState(false);
   const [showAccountDrawer, setShowAccountDrawer] = useState(false);
   const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
+  const [showDebugDrawer, setShowDebugDrawer] = useState(false);
+  const [debugLogs, setDebugLogs] = useState([]);
 
   // Bottom sheet ref
   const bottomSheetRef = useRef(null);
   const snapPoints = useMemo(() => ["50%", "90%"], []);
+
+  // Debug logging function
+  const addDebugLog = useCallback((message) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setDebugLogs((prev) => [...prev, `[${timestamp}] ${message}`].slice(-100)); // Keep last 100 logs
+  }, []);
+
+  // Override console.log to capture logs
+  useEffect(() => {
+    const originalLog = console.log;
+    console.log = (...args) => {
+      originalLog(...args);
+      addDebugLog(args.join(" "));
+    };
+    return () => {
+      console.log = originalLog;
+    };
+  }, [addDebugLog]);
 
   // Get native token info based on current network
   const getNativeTokenInfo = useCallback(() => {
@@ -246,9 +266,9 @@ export default function App() {
         const formattedTransactions = data.transactions.map((tx) => {
           // Handle both Unix timestamp (number) and ISO string formats
           let date;
-          if (typeof tx.timestamp === 'string') {
+          if (typeof tx.timestamp === "string") {
             date = new Date(tx.timestamp);
-          } else if (typeof tx.timestamp === 'number') {
+          } else if (typeof tx.timestamp === "number") {
             date = new Date(tx.timestamp * 1000);
           } else {
             date = new Date();
@@ -256,7 +276,10 @@ export default function App() {
           const isValidDate = !isNaN(date.getTime());
 
           // Parse amount - could be string or number
-          const amountNum = typeof tx.amount === 'string' ? parseFloat(tx.amount) : (tx.amount || 0);
+          const amountNum =
+            typeof tx.amount === "string"
+              ? parseFloat(tx.amount)
+              : tx.amount || 0;
 
           return {
             id: tx.hash || tx.signature,
@@ -398,8 +421,7 @@ export default function App() {
             <TouchableOpacity
               style={[
                 styles.quickSwitchButton,
-                currentNetwork.id === "X1" &&
-                  styles.quickSwitchButtonActive,
+                currentNetwork.id === "X1" && styles.quickSwitchButtonActive,
               ]}
               onPress={() => switchNetwork(NETWORKS[0])}
             >
@@ -441,9 +463,7 @@ export default function App() {
             ]}
             onPress={() => setActiveTab("tokens")}
           >
-            <Text style={styles.viewToggleText}>
-              Tokens
-            </Text>
+            <Text style={styles.viewToggleText}>Tokens</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
@@ -452,9 +472,7 @@ export default function App() {
             ]}
             onPress={() => setActiveTab("activity")}
           >
-            <Text style={styles.viewToggleText}>
-              Activity
-            </Text>
+            <Text style={styles.viewToggleText}>Activity</Text>
           </TouchableOpacity>
         </View>
 
@@ -533,7 +551,7 @@ export default function App() {
                 })}
               </View>
             </View>
-        </ScrollView>
+          </ScrollView>
         ) : (
           <ScrollView
             style={styles.mainContent}
@@ -552,9 +570,7 @@ export default function App() {
                     <Text style={styles.activityCardTitle}>
                       {tx.type === "received" ? "Received" : "Sent"} {tx.token}
                     </Text>
-                    <Text style={styles.activityCardTime}>
-                      {tx.timestamp}
-                    </Text>
+                    <Text style={styles.activityCardTime}>{tx.timestamp}</Text>
                   </View>
 
                   {/* Amount row */}
@@ -585,7 +601,6 @@ export default function App() {
             </View>
           </ScrollView>
         )}
-
       </SafeAreaView>
 
       {/* Network Selector Side Drawer */}
@@ -672,10 +687,7 @@ export default function App() {
 
           {/* Network Logo */}
           <View style={styles.bottomSheetLogo}>
-            <Image
-              source={currentNetwork.logo}
-              style={styles.x1LogoMedium}
-            />
+            <Image source={currentNetwork.logo} style={styles.x1LogoMedium} />
           </View>
 
           {/* Wallets List */}
@@ -719,7 +731,6 @@ export default function App() {
               <Text style={styles.bottomSheetAddButtonText}>Add</Text>
             </TouchableOpacity>
           </ScrollView>
-
         </BottomSheetView>
       </BottomSheet>
 
@@ -901,7 +912,67 @@ export default function App() {
                   </Text>
                   <Text style={styles.settingsMenuItemArrow}>›</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => {
+                    setShowSettingsDrawer(false);
+                    setShowDebugDrawer(true);
+                  }}
+                >
+                  <Text style={styles.settingsMenuItemText}>Debug</Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
               </ScrollView>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Debug Drawer */}
+      <Modal
+        visible={showDebugDrawer}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowDebugDrawer(false)}
+      >
+        <Pressable
+          style={styles.settingsDrawerOverlay}
+          onPress={() => setShowDebugDrawer(false)}
+        >
+          <Pressable
+            style={styles.settingsDrawerContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.settingsDrawerContentArea}>
+              {/* Header */}
+              <View style={styles.settingsDrawerHeader}>
+                <Text style={styles.settingsDrawerTitle}>Debug Console</Text>
+                <TouchableOpacity onPress={() => setShowDebugDrawer(false)}>
+                  <Text style={styles.settingsDrawerClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Debug Logs */}
+              <ScrollView style={styles.debugLogList}>
+                {debugLogs.length === 0 ? (
+                  <Text style={styles.debugNoLogs}>No logs yet...</Text>
+                ) : (
+                  debugLogs.map((log, index) => (
+                    <Text key={index} style={styles.debugLogText}>
+                      {log}
+                    </Text>
+                  ))
+                )}
+              </ScrollView>
+
+              {/* Clear Button */}
+              <TouchableOpacity
+                style={styles.debugClearButton}
+                onPress={() => setDebugLogs([])}
+              >
+                <Text style={styles.debugClearButtonText}>Clear Logs</Text>
+              </TouchableOpacity>
             </View>
           </Pressable>
         </Pressable>
@@ -1649,5 +1720,37 @@ const styles = StyleSheet.create({
   settingsMenuItemArrow: {
     fontSize: 20,
     color: "#666666",
+  },
+  debugLogList: {
+    flex: 1,
+    marginBottom: 16,
+  },
+  debugNoLogs: {
+    fontSize: 14,
+    color: "#666666",
+    textAlign: "center",
+    paddingVertical: 20,
+  },
+  debugLogText: {
+    fontSize: 12,
+    color: "#CCCCCC",
+    fontFamily: "monospace",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: "#0a0a0a",
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  debugClearButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: "#4A90E2",
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  debugClearButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
 });
