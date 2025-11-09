@@ -359,15 +359,14 @@ export default function App() {
   );
 
   const openExplorer = (signature) => {
+    let url;
     if (currentNetwork.id === "SOLANA") {
-      const url = `https://explorer.solana.com/tx/${signature}`;
-      Linking.openURL(url);
+      url = `https://explorer.solana.com/tx/${signature}`;
     } else {
-      Alert.alert(
-        "Explorer",
-        `Would open explorer for transaction: ${signature}`
-      );
+      // X1 network
+      url = `http://explorer.mainnet.x1.xyz/tx/${signature}`;
     }
+    Linking.openURL(url);
   };
 
   return (
