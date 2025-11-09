@@ -33,6 +33,9 @@ const path = require("path");
 const PORT = 4000;
 const X1_MAINNET_RPC_URL = "https://rpc.mainnet.x1.xyz";
 const X1_TESTNET_RPC_URL = "https://rpc.testnet.x1.xyz";
+const SOLANA_MAINNET_RPC_URL = "https://capable-autumn-thunder.solana-mainnet.quiknode.pro/3d4ed46b454fa0ca3df983502fdf15fe87145d9e/";
+const SOLANA_DEVNET_RPC_URL = "https://api.devnet.solana.com";
+const SOLANA_TESTNET_RPC_URL = "https://api.testnet.solana.com";
 const XNT_PRICE = 1.0; // $1 per XNT
 const DB_PATH = path.join(__dirname, "transactions.db");
 
@@ -420,7 +423,36 @@ function setCachedBalance(address, network, balance) {
   });
 }
 
-// Fetch real balance from X1 RPC
+// Oracle endpoint for real-time prices
+const ORACLE_ENDPOINT = "http://oracle.mainnet.x1.xyz:3000/api/state";
+
+// Get SOL price from Oracle (with caching)
+let solPriceCache = { price: 158, timestamp: 0 }; // Default $158, cache for 5 minutes
+async function getSolPrice() {
+  const now = Date.now();
+  if (now - solPriceCache.timestamp < 300000) { // 5 minutes
+    return solPriceCache.price;
+  }
+
+  try {
+    const response = await fetch(ORACLE_ENDPOINT);
+    const data = await response.json();
+    const solPrice = parseFloat(data.agg.SOL.avg);
+
+    if (solPrice && solPrice > 0) {
+      solPriceCache = { price: solPrice, timestamp: now };
+      return solPrice;
+    }
+
+    // Fallback to cached price if invalid response
+    return solPriceCache.price;
+  } catch (error) {
+    console.error("Error fetching SOL price from oracle:", error);
+    return solPriceCache.price; // Return cached price on error
+  }
+}
+
+// Fetch real balance from X1 or Solana RPC
 async function getX1Balance(address, rpcUrl) {
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
@@ -472,34 +504,60 @@ async function getX1Balance(address, rpcUrl) {
 }
 
 // Get wallet data with real balance from X1 RPC
-async function getWalletData(address, network = "mainnet") {
-  const rpcUrl =
-    network === "testnet" ? X1_TESTNET_RPC_URL : X1_MAINNET_RPC_URL;
-  console.log(`  Using ${network} RPC: ${rpcUrl}`);
+async function getWalletData(address, network = "mainnet", blockchain = "x1") {
+  // Determine RPC URL based on blockchain and network
+  let rpcUrl;
+  let tokenSymbol;
+  let tokenName;
+
+  if (blockchain === "solana") {
+    // Solana blockchain
+    if (network === "devnet") {
+      rpcUrl = SOLANA_DEVNET_RPC_URL;
+    } else if (network === "testnet") {
+      rpcUrl = SOLANA_TESTNET_RPC_URL;
+    } else {
+      rpcUrl = SOLANA_MAINNET_RPC_URL;
+    }
+    tokenSymbol = "SOL";
+    tokenName = "Solana";
+  } else {
+    // X1 blockchain
+    rpcUrl = network === "testnet" ? X1_TESTNET_RPC_URL : X1_MAINNET_RPC_URL;
+    tokenSymbol = "XNT";
+    tokenName = "X1 Native Token";
+  }
+
+  console.log(`  Using ${blockchain} ${network} RPC: ${rpcUrl}`);
 
   try {
-    // Check cache first
-    let balance = getCachedBalance(address, network);
+    // Check cache first (cache key includes blockchain)
+    let balance = getCachedBalance(address, `${blockchain}-${network}`);
 
     if (balance === null) {
       // Not in cache or expired, fetch from RPC
       balance = await getX1Balance(address, rpcUrl);
-      setCachedBalance(address, network, balance);
-      console.log(`  Balance from X1 RPC: ${balance} XNT`);
+      setCachedBalance(address, `${blockchain}-${network}`, balance);
+      console.log(`  Balance from ${blockchain.toUpperCase()} RPC: ${balance} ${tokenSymbol}`);
     }
+
+    // Determine logo based on blockchain
+    const logo = blockchain === "solana" ? "./solana.png" : "./x1.png";
+    // Get real SOL price or use fixed XNT price
+    const price = blockchain === "solana" ? await getSolPrice() : XNT_PRICE;
 
     return {
       balance: balance,
       tokens: [
         {
-          mint: "XNT111111111111111111111111111111111111111",
+          mint: "11111111111111111111111111111111", // Native token address for SVM chains
           decimals: 9,
           balance: balance,
-          logo: "./x1.png",
-          name: "X1 Native Token",
-          symbol: "XNT",
-          price: XNT_PRICE,
-          valueUSD: balance * XNT_PRICE,
+          logo: logo,
+          name: tokenName,
+          symbol: tokenSymbol,
+          price: price,
+          valueUSD: balance * price,
         },
       ],
     };
@@ -971,30 +1029,55 @@ const server = http.createServer((req, res) => {
   // Match /wallet/:address pattern
   const walletMatch = pathname.match(/^\/wallet\/([a-zA-Z0-9]+)$/);
 
-  // Check if this is an X1 request (either "X1", "X1-testnet", or "X1-mainnet")
+  // Check if this is a supported request (X1 or Solana)
   const providerId = query.providerId || "";
   const isX1Request =
     providerId === "X1" ||
     providerId === "X1-testnet" ||
     providerId === "X1-mainnet";
 
-  if (walletMatch && isX1Request) {
+  const isSolanaRequest =
+    providerId === "SOLANA" ||
+    providerId === "SOLANA-mainnet" ||
+    providerId === "SOLANA-devnet" ||
+    providerId === "SOLANA-testnet";
+
+  if (walletMatch && (isX1Request || isSolanaRequest)) {
     const address = walletMatch[1];
     // Determine network from providerId suffix or network query param
     let network = "mainnet";
-    if (providerId === "X1-testnet") {
-      network = "testnet";
-    } else if (providerId === "X1-mainnet") {
-      network = "mainnet";
-    } else if (query.network) {
-      network = query.network;
+
+    let blockchain = "x1"; // Default to X1
+
+    if (isX1Request) {
+      blockchain = "x1";
+      if (providerId === "X1-testnet") {
+        network = "testnet";
+      } else if (providerId === "X1-mainnet") {
+        network = "mainnet";
+      } else if (query.network) {
+        network = query.network;
+      }
+      console.log(
+        `✅ X1 wallet request for address: ${address} on ${network} (providerId: ${providerId})`
+      );
+    } else {
+      // Solana request - map to corresponding network
+      blockchain = "solana";
+      if (providerId === "SOLANA-devnet") {
+        network = "devnet";
+      } else if (providerId === "SOLANA-testnet") {
+        network = "testnet";
+      } else {
+        network = "mainnet";
+      }
+      console.log(
+        `✅ Solana wallet request for address: ${address} on ${network} (providerId: ${providerId})`
+      );
     }
-    console.log(
-      `✅ X1 wallet request for address: ${address} on ${network} (providerId: ${providerId})`
-    );
 
     // Async call to get wallet data
-    getWalletData(address, network)
+    getWalletData(address, network, blockchain)
       .then((data) => {
         res.writeHead(200);
         res.end(JSON.stringify(data, null, 2));
@@ -1005,7 +1088,7 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ error: "Internal server error" }));
       });
   } else {
-    console.log(`❌ Invalid request: ${pathname}`);
+    console.log(`❌ Invalid request: ${pathname} (providerId: ${providerId})`);
     res.writeHead(404);
     res.end(JSON.stringify({ error: "Not found" }));
   }

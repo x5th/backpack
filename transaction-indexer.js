@@ -23,6 +23,11 @@ const CONFIG = {
   X1_TESTNET_RPC: "https://rpc.testnet.x1.xyz",
   X1_MAINNET_RPC: "https://rpc.mainnet.x1.xyz",
 
+  // Solana RPC endpoints (using QuickNode for mainnet)
+  SOLANA_MAINNET_RPC: "https://capable-autumn-thunder.solana-mainnet.quiknode.pro/3d4ed46b454fa0ca3df983502fdf15fe87145d9e/",
+  SOLANA_DEVNET_RPC: "https://api.devnet.solana.com",
+  SOLANA_TESTNET_RPC: "https://api.testnet.solana.com",
+
   // API server endpoint
   API_SERVER: "http://localhost:4000",
 
@@ -144,11 +149,16 @@ async function getTransaction(rpcUrl, signature) {
  * @param {object} txData - Transaction data from RPC
  * @param {string} signature - Transaction signature/hash
  * @param {string} walletAddress - The wallet address we're indexing for
+ * @param {string} blockchain - The blockchain type ("x1" or "solana")
  */
-function parseTransaction(txData, signature, walletAddress) {
+function parseTransaction(txData, signature, walletAddress, blockchain = "x1") {
   try {
     const tx = txData.transaction;
     const meta = txData.meta;
+
+    // Determine token name and symbol based on blockchain
+    const tokenName = blockchain === "solana" ? "Solana" : "X1 Token";
+    const tokenSymbol = blockchain === "solana" ? "SOL" : "XNT";
 
     // Determine transaction type based on instructions
     let type = "UNKNOWN";
@@ -176,11 +186,11 @@ function parseTransaction(txData, signature, walletAddress) {
       if (balanceChange > 0) {
         type = "RECEIVE";
         amount = (balanceChange / 1e9).toFixed(9);
-        description = "Received XNT";
+        description = `Received ${tokenSymbol}`;
       } else if (balanceChange < 0) {
         type = "SEND";
         amount = (Math.abs(balanceChange) / 1e9).toFixed(9);
-        description = "Sent XNT";
+        description = `Sent ${tokenSymbol}`;
       }
     }
 
@@ -197,8 +207,8 @@ function parseTransaction(txData, signature, walletAddress) {
       type,
       timestamp,
       amount,
-      tokenName: "X1 Token",
-      tokenSymbol: "XNT",
+      tokenName,
+      tokenSymbol,
       fee,
       feePayer: tx.message?.accountKeys?.[0]?.pubkey || null,
       description: description || `${type} transaction`,
@@ -210,13 +220,16 @@ function parseTransaction(txData, signature, walletAddress) {
     console.error(`Error parsing transaction ${signature}:`, error);
 
     // Return minimal transaction data
+    const tokenName = blockchain === "solana" ? "Solana" : "X1 Token";
+    const tokenSymbol = blockchain === "solana" ? "SOL" : "XNT";
+
     return {
       hash: signature,
       type: "UNKNOWN",
       timestamp: new Date().toISOString(),
       amount: null,
-      tokenName: "X1 Token",
-      tokenSymbol: "XNT",
+      tokenName,
+      tokenSymbol,
       fee: "0",
       feePayer: null,
       description: "Parse error",
@@ -363,10 +376,38 @@ async function indexWallet(wallet) {
     return;
   }
 
-  const rpcUrl =
-    network === "mainnet" ? CONFIG.X1_MAINNET_RPC : CONFIG.X1_TESTNET_RPC;
+  // Determine RPC URL and provider ID based on network
+  let rpcUrl;
+  let providerId;
+  let blockchain = "x1"; // Default to X1
 
-  const providerId = network === "mainnet" ? "X1-mainnet" : "X1-testnet";
+  // Support both X1 and Solana networks
+  if (network === "mainnet" || network === "X1-mainnet") {
+    rpcUrl = CONFIG.X1_MAINNET_RPC;
+    providerId = "X1-mainnet";
+    blockchain = "x1";
+  } else if (network === "testnet" || network === "X1-testnet") {
+    rpcUrl = CONFIG.X1_TESTNET_RPC;
+    providerId = "X1-testnet";
+    blockchain = "x1";
+  } else if (network === "SOLANA-mainnet") {
+    rpcUrl = CONFIG.SOLANA_MAINNET_RPC;
+    providerId = "SOLANA-mainnet";
+    blockchain = "solana";
+  } else if (network === "SOLANA-devnet") {
+    rpcUrl = CONFIG.SOLANA_DEVNET_RPC;
+    providerId = "SOLANA-devnet";
+    blockchain = "solana";
+  } else if (network === "SOLANA-testnet") {
+    rpcUrl = CONFIG.SOLANA_TESTNET_RPC;
+    providerId = "SOLANA-testnet";
+    blockchain = "solana";
+  } else {
+    // Default to X1 testnet
+    rpcUrl = CONFIG.X1_TESTNET_RPC;
+    providerId = "X1-testnet";
+    blockchain = "x1";
+  }
 
   console.log(
     `\n🔍 Indexing wallet: ${address.substring(0, 8)}... (${network})`
@@ -394,7 +435,7 @@ async function indexWallet(wallet) {
     for (const sigInfo of signatures) {
       try {
         const txData = await getTransaction(rpcUrl, sigInfo.signature);
-        const parsed = parseTransaction(txData, sigInfo.signature, address);
+        const parsed = parseTransaction(txData, sigInfo.signature, address, blockchain);
         transactions.push(parsed);
       } catch (error) {
         console.error(
@@ -464,10 +505,13 @@ async function pollAll() {
  */
 async function start() {
   console.log("\n" + "=".repeat(80));
-  console.log("🚀 X1 Transaction Indexer Started");
+  console.log("🚀 X1 & Solana Transaction Indexer Started");
   console.log("=".repeat(80));
-  console.log(`📡 Testnet RPC: ${CONFIG.X1_TESTNET_RPC}`);
-  console.log(`📡 Mainnet RPC: ${CONFIG.X1_MAINNET_RPC}`);
+  console.log(`📡 X1 Testnet RPC: ${CONFIG.X1_TESTNET_RPC}`);
+  console.log(`📡 X1 Mainnet RPC: ${CONFIG.X1_MAINNET_RPC}`);
+  console.log(`📡 Solana Mainnet RPC: ${CONFIG.SOLANA_MAINNET_RPC}`);
+  console.log(`📡 Solana Devnet RPC: ${CONFIG.SOLANA_DEVNET_RPC}`);
+  console.log(`📡 Solana Testnet RPC: ${CONFIG.SOLANA_TESTNET_RPC}`);
   console.log(`🔗 API Server: ${CONFIG.API_SERVER}`);
   console.log(`⏱️  Poll Interval: ${CONFIG.POLL_INTERVAL_MS / 1000}s`);
   console.log(`\n💡 Wallets are loaded dynamically from the database`);
