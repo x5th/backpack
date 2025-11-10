@@ -27,8 +27,18 @@ import {
   TextInput,
   PermissionsAndroid,
   Platform,
+  NativeModules,
 } from "react-native";
-import { Keypair, Connection, clusterApiUrl } from "@solana/web3.js";
+import {
+  Keypair,
+  Connection,
+  clusterApiUrl,
+  PublicKey,
+  Transaction,
+  SystemProgram,
+  LAMPORTS_PER_SOL,
+  sendAndConfirmTransaction,
+} from "@solana/web3.js";
 import * as bip39 from "bip39";
 import { randomBytes, secretbox } from "tweetnacl";
 import bs58 from "bs58";
@@ -38,9 +48,11 @@ import BottomSheet, {
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import QRCode from "react-native-qrcode-svg";
-import { BleManager } from "react-native-ble-plx";
 import TransportBLE from "@ledgerhq/react-native-hw-transport-ble";
 import AppSolana from "@ledgerhq/hw-app-solana";
+
+// Import native USB Ledger module
+const { LedgerUsb } = NativeModules;
 
 // Network configurations
 const API_SERVER = "http://162.250.126.66:4000";
@@ -170,7 +182,12 @@ export default function App() {
   const [ledgerScanning, setLedgerScanning] = useState(false);
   const [ledgerAccounts, setLedgerAccounts] = useState([]);
   const [ledgerConnecting, setLedgerConnecting] = useState(false);
-  const bleManagerRef = useRef(null);
+  const [ledgerDeviceId, setLedgerDeviceId] = useState(null); // Store device ID to skip scanning
+  const [ledgerConnectionType, setLedgerConnectionType] = useState("usb"); // 'usb' or 'bluetooth'
+  const ledgerTransportRef = useRef(null); // Store transport reference for cleanup
+  const ledgerScanSubscriptionRef = useRef(null); // Store scan subscription for cleanup
+  const ledgerCleaningRef = useRef(false); // Prevent concurrent cleanup
+  const ledgerCleanedUpRef = useRef(false); // Track if cleanup has already been completed
 
   // Send and Receive states
   const [showReceiveDrawer, setShowReceiveDrawer] = useState(false);
@@ -178,6 +195,10 @@ export default function App() {
   const [sendAmount, setSendAmount] = useState("");
   const [sendAddress, setSendAddress] = useState("");
   const [showAddressSelector, setShowAddressSelector] = useState(false);
+  const [showSendConfirm, setShowSendConfirm] = useState(false);
+  const [sendConfirming, setSendConfirming] = useState(false);
+  const [sendSignature, setSendSignature] = useState("");
+  const [sendError, setSendError] = useState("");
 
   // Bottom sheet ref
   const bottomSheetRef = useRef(null);
@@ -201,24 +222,21 @@ export default function App() {
     };
   }, [addDebugLog]);
 
-  // Initialize BleManager for Ledger support
+  // Cleanup Ledger BLE on component unmount
   useEffect(() => {
-    try {
-      if (!bleManagerRef.current) {
-        bleManagerRef.current = new BleManager();
-        console.log("BleManager initialized successfully");
-      }
-    } catch (error) {
-      console.error("Failed to initialize BleManager:", error);
-    }
-
     return () => {
-      if (bleManagerRef.current) {
-        try {
-          bleManagerRef.current.destroy();
-        } catch (e) {
-          console.log("Error destroying BleManager:", e);
-        }
+      console.log("Component unmounting, cleaning up Ledger BLE...");
+      try {
+        ledgerScanSubscriptionRef.current?.unsubscribe();
+        console.log("Unsubscribed from BLE scan");
+      } catch (e) {
+        console.log("Error unsubscribing:", e.message);
+      }
+      try {
+        ledgerTransportRef.current?.close();
+        console.log("Disconnected transport");
+      } catch (e) {
+        console.log("Error disconnecting transport:", e.message);
       }
     };
   }, []);
@@ -422,14 +440,105 @@ export default function App() {
       Alert.alert("Error", "Please enter both address and amount");
       return;
     }
-    // TODO: Implement actual send transaction
-    Alert.alert(
-      "Success",
-      `Sent ${sendAmount} ${getNativeTokenInfo().symbol} to ${sendAddress.substring(0, 8)}...`
-    );
+
+    // Validate address format
+    try {
+      new PublicKey(sendAddress);
+    } catch (e) {
+      Alert.alert("Error", "Invalid recipient address");
+      return;
+    }
+
+    // Validate amount
+    const amountNum = parseFloat(sendAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      Alert.alert("Error", "Invalid amount");
+      return;
+    }
+
+    // Check balance
+    const balanceNum = parseFloat(balance.replace(/,/g, ""));
+    if (amountNum > balanceNum) {
+      Alert.alert("Error", "Insufficient balance");
+      return;
+    }
+
+    // Close send drawer and show confirmation screen
     setShowSendDrawer(false);
-    setSendAmount("");
-    setSendAddress("");
+    setShowSendConfirm(true);
+    setSendConfirming(true);
+    setSendError("");
+
+    try {
+      console.log("Creating transaction...");
+      console.log("From:", selectedWallet.address);
+      console.log("To:", sendAddress);
+      console.log("Amount:", amountNum);
+      console.log("Network:", currentNetwork.rpcUrl);
+
+      // Create connection to current network
+      const connection = new Connection(currentNetwork.rpcUrl, "confirmed");
+
+      // Create transaction
+      const fromPubkey = new PublicKey(selectedWallet.address);
+      const toPubkey = new PublicKey(sendAddress);
+      const lamports = Math.floor(amountNum * LAMPORTS_PER_SOL);
+
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey,
+          toPubkey,
+          lamports,
+        })
+      );
+
+      // Get recent blockhash
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = fromPubkey;
+
+      // Get the wallet's keypair for signing
+      // For demo wallet, we need to get the keypair from the encrypted seed
+      const selectedWalletData = wallets.find(
+        (w) => w.id === selectedWallet.id
+      );
+      if (!selectedWalletData || !selectedWalletData.keypair) {
+        throw new Error(
+          "Wallet keypair not found. Please make sure you created or imported this wallet."
+        );
+      }
+
+      const keypair = selectedWalletData.keypair;
+
+      // Sign transaction
+      console.log("Signing transaction...");
+      transaction.sign(keypair);
+
+      // Send transaction
+      console.log("Sending transaction...");
+      const signature = await connection.sendRawTransaction(
+        transaction.serialize()
+      );
+
+      console.log("Transaction sent! Signature:", signature);
+      setSendSignature(signature);
+
+      // Wait for confirmation
+      console.log("Waiting for confirmation...");
+      await connection.confirmTransaction(signature, "confirmed");
+
+      console.log("Transaction confirmed!");
+      setSendConfirming(false);
+
+      // Refresh balance after a short delay
+      setTimeout(() => {
+        fetchWalletBalance(selectedWallet.address);
+      }, 2000);
+    } catch (error) {
+      console.error("Send transaction error:", error);
+      setSendConfirming(false);
+      setSendError(error.message || "Transaction failed");
+    }
   };
 
   const handleSwap = () => {
@@ -545,22 +654,26 @@ export default function App() {
   const requestBluetoothPermissions = async () => {
     if (Platform.OS === "android" && Platform.Version >= 31) {
       try {
+        console.log("Requesting Bluetooth permissions for Android 12+...");
         const granted = await PermissionsAndroid.requestMultiple([
           PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
           PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         ]);
 
-        return (
+        console.log("Permission results:", granted);
+        const allGranted =
           granted["android.permission.BLUETOOTH_SCAN"] ===
             PermissionsAndroid.RESULTS.GRANTED &&
           granted["android.permission.BLUETOOTH_CONNECT"] ===
             PermissionsAndroid.RESULTS.GRANTED &&
           granted["android.permission.ACCESS_FINE_LOCATION"] ===
-            PermissionsAndroid.RESULTS.GRANTED
-        );
+            PermissionsAndroid.RESULTS.GRANTED;
+
+        console.log("All permissions granted:", allGranted);
+        return allGranted;
       } catch (err) {
-        console.warn(err);
+        console.error("Error requesting permissions:", err);
         return false;
       }
     }
@@ -581,36 +694,117 @@ export default function App() {
       return;
     }
 
-    // Show the Ledger modal and start scanning
-    setShowLedgerModal(true);
-    scanForLedger();
+    // Show pairing instructions
+    Alert.alert(
+      "Ledger Bluetooth Setup",
+      "Before connecting, please ensure:\n\n1. Your Ledger is unlocked\n2. The Solana app is open on your Ledger\n3. Your Ledger is paired in Android Bluetooth settings\n\nTo pair:\n• Go to Settings > Bluetooth\n• Find 'Ledger Flex' or 'Ledger Nano X'\n• Tap to pair and accept pairing on both devices\n\nOnce paired, tap 'Continue' to connect.",
+      [
+        {
+          text: "Open Settings",
+          onPress: () => {
+            Linking.openSettings();
+          },
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => setShowAddWalletModal(true),
+        },
+        {
+          text: "Continue",
+          onPress: () => {
+            setShowLedgerModal(true);
+            scanForLedger();
+          },
+        },
+      ],
+      { cancelable: false }
+    );
+  };
+
+  // Proper BLE cleanup function following best practices
+  const cleanupLedgerBLE = async () => {
+    // Prevent double cleanup - check if already cleaned up OR currently cleaning
+    if (ledgerCleanedUpRef.current) {
+      console.log("⚠ Cleanup already completed, skipping to prevent crash...");
+      return;
+    }
+
+    if (ledgerCleaningRef.current) {
+      console.log("⚠ Cleanup already in progress, skipping...");
+      return;
+    }
+
+    ledgerCleaningRef.current = true;
+    console.log("Starting Ledger BLE cleanup...");
+
+    try {
+      // 1. Unsubscribe from scan first
+      if (ledgerScanSubscriptionRef.current) {
+        console.log("Unsubscribing from BLE scan...");
+        try {
+          ledgerScanSubscriptionRef.current.unsubscribe();
+          ledgerScanSubscriptionRef.current = null;
+          console.log("Scan subscription cleaned up");
+        } catch (e) {
+          console.log("Error unsubscribing from scan:", e.message);
+        }
+      }
+
+      // 2. Disconnect transport properly (don't just close)
+      if (ledgerTransportRef.current) {
+        console.log("Disconnecting Ledger transport...");
+        try {
+          // Properly disconnect - this triggers internal BLE disconnect callback
+          await ledgerTransportRef.current.close();
+          console.log("Transport disconnected successfully");
+        } catch (closeError) {
+          console.log("Error disconnecting transport:", closeError.message);
+        }
+
+        // 3. Clear the reference
+        ledgerTransportRef.current = null;
+
+        // 4. Wait for BLE stack to fully cleanup (important!)
+        // Increased to 5 seconds to allow RxJava threads to fully clean up
+        console.log("Waiting 5 seconds for BLE stack to fully cleanup...");
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        console.log("BLE cleanup delay completed");
+      }
+
+      console.log("Ledger BLE cleanup complete");
+      // Mark cleanup as completed to prevent it from running again
+      ledgerCleanedUpRef.current = true;
+    } finally {
+      // Reset the cleaning flag
+      ledgerCleaningRef.current = false;
+    }
   };
 
   // Ledger Bluetooth scanning using official TransportBLE API
   const scanForLedger = async () => {
     try {
+      // Clean up any existing scan subscription ONLY (no 5-second delay)
+      if (ledgerScanSubscriptionRef.current) {
+        console.log("Cleaning up previous scan subscription...");
+        try {
+          ledgerScanSubscriptionRef.current.unsubscribe();
+          ledgerScanSubscriptionRef.current = null;
+        } catch (e) {
+          console.log("Error unsubscribing from previous scan:", e.message);
+        }
+      }
+
+      // Reset cleanup flags to allow fresh cleanup when needed
+      ledgerCleanedUpRef.current = false;
+      ledgerCleaningRef.current = false;
+
+      // Clear device ID to force fresh scan
+      setLedgerDeviceId(null);
+
       setLedgerScanning(true);
       setLedgerAccounts([]);
       console.log("Starting Ledger Bluetooth scan...");
-
-      // Check if BleManager is initialized
-      if (!bleManagerRef.current) {
-        console.log("BleManager not initialized, creating new instance...");
-        bleManagerRef.current = new BleManager();
-      }
-
-      // Check Bluetooth state
-      const state = await bleManagerRef.current.state();
-      console.log("Bluetooth state:", state);
-
-      if (state !== "PoweredOn") {
-        setLedgerScanning(false);
-        Alert.alert(
-          "Bluetooth Not Available",
-          "Please enable Bluetooth to connect to Ledger devices."
-        );
-        return;
-      }
 
       const subscription = TransportBLE.listen({
         complete: () => {
@@ -618,12 +812,24 @@ export default function App() {
           setLedgerScanning(false);
         },
         next: (e) => {
-          console.log("Ledger device event:", e.type, e);
+          console.log("Ledger device event received!");
+          console.log("Event type:", e.type);
           if (e.type === "add") {
             const device = e.descriptor;
             console.log("Found Ledger device:", device);
-            // Auto-connect to the first device found
-            subscription.unsubscribe();
+
+            // CRITICAL: Unsubscribe IMMEDIATELY to prevent multiple connection attempts
+            console.log(
+              "Unsubscribing from scan to prevent multiple connections..."
+            );
+            try {
+              subscription.unsubscribe();
+              console.log("✓ Successfully unsubscribed from scan");
+              ledgerScanSubscriptionRef.current = null;
+            } catch (unsubError) {
+              console.log("⚠ Error unsubscribing:", unsubError.message);
+            }
+
             setLedgerScanning(false);
             connectToLedger(device);
           }
@@ -631,20 +837,28 @@ export default function App() {
         error: (error) => {
           console.error("Ledger scan error:", error);
           setLedgerScanning(false);
+          ledgerScanSubscriptionRef.current = null;
           Alert.alert(
             "Scan Error",
             error.message ||
-              "Failed to scan for Ledger devices. Make sure Bluetooth is enabled and the Solana app is open on your Ledger Nano X."
+              "Failed to scan for Ledger devices. Make sure Bluetooth is enabled and the Solana app is open on your Ledger."
           );
         },
       });
 
+      // Store subscription for cleanup
+      ledgerScanSubscriptionRef.current = subscription;
+      console.log("Scan subscription created and stored");
+
       // Stop scanning after 30 seconds
       setTimeout(() => {
-        if (subscription) {
-          subscription.unsubscribe();
+        if (ledgerScanSubscriptionRef.current) {
+          ledgerScanSubscriptionRef.current.unsubscribe();
+          ledgerScanSubscriptionRef.current = null;
           setLedgerScanning(false);
-          console.log("Ledger scan timeout");
+          console.log(
+            "Ledger scan timeout - no devices found after 30 seconds"
+          );
         }
       }, 30000);
     } catch (error) {
@@ -655,13 +869,44 @@ export default function App() {
   };
 
   const connectToLedger = async (device) => {
+    let transport = null;
     try {
       setLedgerConnecting(true);
-      console.log("Connecting to Ledger device:", device);
 
-      // Connect to the device using the device descriptor/ID
-      const deviceId = device.id || device;
-      const transport = await TransportBLE.open(deviceId);
+      // If device is just a string, it's a device ID
+      const deviceId =
+        typeof device === "string" ? device : device.id || device;
+      const deviceName =
+        typeof device === "string"
+          ? "Ledger (stored)"
+          : device.name || device.localName;
+
+      console.log("Connecting to Ledger device:", deviceName);
+      console.log("Device ID:", deviceId);
+
+      console.log("Opening BLE transport...");
+
+      // Add timeout for connection attempt
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Connection timeout after 30 seconds")),
+          30000
+        )
+      );
+
+      transport = await Promise.race([
+        TransportBLE.open(deviceId),
+        timeoutPromise,
+      ]);
+
+      // Store the transport for future cleanup
+      ledgerTransportRef.current = transport;
+
+      // Note: We intentionally don't store the device ID
+      // Always doing fresh scans avoids BLE library connection issues
+
+      console.log("BLE transport opened successfully");
+      console.log("Creating Solana app instance...");
       const solana = new AppSolana(transport);
 
       // Get first 5 accounts
@@ -670,30 +915,212 @@ export default function App() {
         const derivationPath = `44'/501'/${i}'/0'`;
         console.log(`Getting address for path: ${derivationPath}`);
         const result = await solana.getAddress(derivationPath);
-        const address = result.address || result;
+        const addressBuffer = result.address || result;
+
+        // Convert Buffer/Uint8Array to Base58 string
+        let addressString;
+        if (typeof addressBuffer === "string") {
+          addressString = addressBuffer;
+        } else if (
+          addressBuffer instanceof Buffer ||
+          addressBuffer instanceof Uint8Array
+        ) {
+          addressString = bs58.encode(addressBuffer);
+        } else {
+          addressString = bs58.encode(Buffer.from(addressBuffer));
+        }
+
+        console.log(`Address ${i}: ${addressString}`);
 
         accounts.push({
           index: i,
-          address: typeof address === "string" ? address : address.toString(),
+          address: addressString,
           derivationPath,
         });
       }
 
-      await transport.close();
+      // DON'T close transport immediately! Keep it alive.
+      // This prevents the BLE crash from happening during the RxJava cleanup phase.
+      // The transport will be cleaned up when:
+      // - User selects an account (handleSelectLedgerAccount)
+      // - Modal is dismissed
+      // - Next scan is initiated
+      console.log("Keeping transport alive for account selection...");
+      console.log("Successfully retrieved Ledger accounts!");
+
+      // Set accounts and update state - transport stays alive
       setLedgerAccounts(accounts);
       setLedgerConnecting(false);
-      console.log("Successfully retrieved Ledger accounts:", accounts);
+      console.log(`Found ${accounts.length} accounts from Ledger`);
     } catch (error) {
       setLedgerConnecting(false);
       console.error("Error connecting to Ledger:", error);
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+
+      // Try to clean up transport if it was created
+      if (transport) {
+        try {
+          await transport.close();
+          ledgerTransportRef.current = null;
+          console.log("Transport cleaned up after error");
+        } catch (closeError) {
+          console.log(
+            "Error closing transport after error (ignoring):",
+            closeError.message
+          );
+          // Store in ref for cleanup attempt next time
+          ledgerTransportRef.current = transport;
+        }
+      }
+
+      let errorMessage = "Failed to connect to Ledger device. ";
+      if (error.message && error.message.includes("timeout")) {
+        errorMessage +=
+          "Connection timed out. Make sure the Solana app is open on your Ledger and Bluetooth pairing is accepted.";
+      } else if (error.message && error.message.includes("pairing")) {
+        errorMessage +=
+          "Pairing failed. Please pair your Ledger in Android Bluetooth settings first, then try again.";
+      } else if (error.message) {
+        errorMessage += error.message;
+      } else {
+        errorMessage +=
+          "Please ensure:\n• Ledger is unlocked\n• Solana app is open on Ledger\n• Device is paired in Bluetooth settings";
+      }
+
+      Alert.alert("Connection Error", errorMessage, [
+        {
+          text: "Open Bluetooth Settings",
+          onPress: () => Linking.openSettings(),
+        },
+        { text: "OK" },
+      ]);
+    }
+  };
+
+  // USB Ledger connection function
+  const connectToLedgerUsb = async () => {
+    try {
+      setLedgerConnecting(true);
+      console.log("Starting USB Ledger connection...");
+
+      // Check if USB module is available
+      if (!LedgerUsb) {
+        throw new Error("LedgerUsb native module not available");
+      }
+
+      // List USB devices
+      console.log("Listing USB devices...");
+      const devices = await LedgerUsb.listDevices();
+      console.log("Found USB devices:", devices);
+
+      if (devices.length === 0) {
+        throw new Error("No Ledger device found via USB");
+      }
+
+      // Request permission
+      console.log("Requesting USB permission...");
+      const hasPermission = await LedgerUsb.requestPermission();
+      console.log("USB permission granted:", hasPermission);
+
+      if (!hasPermission) {
+        throw new Error(
+          "USB permission not granted. Please accept the USB permission dialog."
+        );
+      }
+
+      // Connect to device
+      console.log("Connecting to USB device...");
+      const connected = await LedgerUsb.connect();
+      console.log("USB connected:", connected);
+
+      if (!connected) {
+        throw new Error("Failed to connect to USB device");
+      }
+
+      // Get first 5 Solana accounts
+      console.log("Getting Solana addresses...");
+      const accounts = [];
+
+      for (let i = 0; i < 5; i++) {
+        const derivationPath = `44'/501'/${i}'/0'`;
+        console.log(`Getting address for path: ${derivationPath}`);
+
+        // Solana getAddress APDU command
+        // CLA INS P1 P2 LC [data]
+        // E0  05  00 01 LC [path_data]
+        const pathElements = [
+          44 + 0x80000000,
+          501 + 0x80000000,
+          i + 0x80000000,
+          0,
+        ];
+        const pathData = [];
+        pathData.push(pathElements.length); // Number of path elements
+
+        // Convert each path element to 4 bytes (big endian)
+        for (const element of pathElements) {
+          pathData.push((element >> 24) & 0xff);
+          pathData.push((element >> 16) & 0xff);
+          pathData.push((element >> 8) & 0xff);
+          pathData.push(element & 0xff);
+        }
+
+        const apdu = [
+          0xe0, // CLA
+          0x05, // INS (GET_PUBKEY)
+          0x00, // P1 (non-confirm)
+          0x01, // P2 (return address)
+          pathData.length, // LC
+          ...pathData,
+        ];
+
+        console.log("Sending APDU:", apdu);
+        const response = await LedgerUsb.sendApdu(apdu);
+        console.log("APDU response:", response);
+
+        // Parse response: [pubkey(32 bytes)][address_length(1 byte)][address][SW1 SW2]
+        if (response.length < 34) {
+          throw new Error(`Invalid response length: ${response.length}`);
+        }
+
+        // Extract address
+        const addressLength = response[32];
+        const addressBytes = response.slice(33, 33 + addressLength);
+        const addressString = String.fromCharCode(...addressBytes);
+
+        console.log(`Address ${i}: ${addressString}`);
+
+        accounts.push({
+          index: i,
+          address: addressString,
+          derivationPath,
+        });
+      }
+
+      // Disconnect
+      console.log("Disconnecting from USB device...");
+      await LedgerUsb.disconnect();
+      console.log("USB disconnected");
+
+      // Set accounts and update state
+      setLedgerAccounts(accounts);
+      setLedgerConnecting(false);
+      console.log("Successfully retrieved Ledger accounts via USB!");
+    } catch (error) {
+      setLedgerConnecting(false);
+      console.error("Error connecting to USB Ledger:", error);
+
       Alert.alert(
-        "Connection Error",
-        error.message || "Failed to connect to Ledger"
+        "USB Connection Error",
+        error.message || "Failed to connect to Ledger via USB",
+        [{ text: "OK" }]
       );
     }
   };
 
-  const handleSelectLedgerAccount = (account) => {
+  const handleSelectLedgerAccount = async (account) => {
     const newWallet = {
       id: Date.now(),
       name: `Ledger ${account.index + 1}`,
@@ -708,6 +1135,12 @@ export default function App() {
     setShowLedgerModal(false);
     setLedgerAccounts([]);
     Alert.alert("Success", `Added Ledger account ${account.index + 1}`);
+
+    // Clean up BLE connection after account is selected
+    // Run in background to not block UI
+    cleanupLedgerBLE().catch((e) =>
+      console.log("Cleanup error (ignoring):", e.message)
+    );
   };
 
   const handleSheetChanges = useCallback((index) => {
@@ -1782,22 +2215,26 @@ export default function App() {
                 <View style={styles.ledgerStatus}>
                   <Text style={styles.ledgerStatusText}>Connecting...</Text>
                 </View>
-              ) : ledgerAccounts.length > 0 ? (
-                <ScrollView>
+              ) : Array.isArray(ledgerAccounts) && ledgerAccounts.length > 0 ? (
+                <ScrollView style={{ maxHeight: 400 }}>
                   <Text style={styles.ledgerAccountsTitle}>
                     Select an account:
                   </Text>
                   {ledgerAccounts.map((account) => (
                     <TouchableOpacity
-                      key={account.index}
+                      key={`ledger-${account.index}`}
                       style={styles.ledgerAccount}
                       onPress={() => handleSelectLedgerAccount(account)}
                     >
                       <Text style={styles.ledgerAccountIndex}>
                         Account {account.index + 1}
                       </Text>
-                      <Text style={styles.ledgerAccountAddress}>
-                        {account.address}
+                      <Text
+                        style={styles.ledgerAccountAddress}
+                        numberOfLines={2}
+                        ellipsizeMode="middle"
+                      >
+                        {account.address || "Unknown address"}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -2909,5 +3346,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#FFFFFF",
     fontFamily: "monospace",
+    flexWrap: "wrap",
+    maxWidth: "100%",
   },
 });
