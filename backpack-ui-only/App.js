@@ -464,6 +464,18 @@ export default function App() {
     checkTransactions();
   }, [selectedWallet?.publicKey, currentNetwork]);
 
+  // Auto-refresh balance every 3 seconds
+  useEffect(() => {
+    if (!selectedWallet) return;
+
+    const interval = setInterval(() => {
+      checkBalance(null, false); // Don't use cache for auto-refresh
+      checkTransactions();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [selectedWallet?.publicKey, currentNetwork]);
+
   const switchNetwork = (network) => {
     setCurrentNetwork(network);
     // Use cache for instant switch, then fetch fresh data in background
@@ -1951,11 +1963,6 @@ export default function App() {
                 </View>
               </TouchableOpacity>
             ))}
-
-            {/* Add Button */}
-            <TouchableOpacity style={styles.bottomSheetAddButton}>
-              <Text style={styles.bottomSheetAddButtonText}>+</Text>
-            </TouchableOpacity>
           </ScrollView>
         </BottomSheetView>
       </BottomSheet>
@@ -2757,19 +2764,6 @@ export default function App() {
                 >
                   <Text style={styles.settingsMenuItemText}>
                     Change Account Name
-                  </Text>
-                  <Text style={styles.settingsMenuItemArrow}>›</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.settingsMenuItem}
-                  onPress={() => {
-                    setShowEditWalletModal(false);
-                    setShowViewPrivateKeyModal(true);
-                  }}
-                >
-                  <Text style={styles.settingsMenuItemText}>
-                    Show Private Key
                   </Text>
                   <Text style={styles.settingsMenuItemArrow}>›</Text>
                 </TouchableOpacity>
