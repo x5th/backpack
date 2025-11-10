@@ -47,6 +47,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetView,
+  BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
 import QRCode from "react-native-qrcode-svg";
 import TransportBLE from "@ledgerhq/react-native-hw-transport-ble";
@@ -1627,8 +1628,6 @@ export default function App() {
     // Register the wallet with the transaction indexer
     await registerWalletWithIndexer(account.address, currentNetwork.providerId);
 
-    Alert.alert("Success", `Added Ledger account ${account.index + 1}`);
-
     // Clean up BLE connection after account is selected
     // Run in background to not block UI
     cleanupLedgerBLE().catch((e) =>
@@ -1943,20 +1942,6 @@ export default function App() {
                         </View>
                         <View style={styles.bluetoothDeviceButtons}>
                           <TouchableOpacity
-                            style={styles.bluetoothDeviceConnectButton}
-                            onPress={async () => {
-                              setShowBluetoothDrawer(false);
-                              ledgerSheetRef.current?.expand();
-                              setLedgerDeviceId(device.id);
-                              // Re-connect to this device
-                              await connectToLedger(device);
-                            }}
-                          >
-                            <Text style={styles.bluetoothDeviceConnectText}>
-                              Connect
-                            </Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
                             style={styles.bluetoothDeviceDeleteButton}
                             onPress={() => forgetBluetoothDevice(device.id)}
                           >
@@ -1970,7 +1955,7 @@ export default function App() {
                   )}
                 </ScrollView>
 
-                {/* Connect Button */}
+                {/* Scan Button */}
                 <TouchableOpacity
                   style={styles.bluetoothRefreshButton}
                   onPress={async () => {
@@ -1979,9 +1964,7 @@ export default function App() {
                     await scanForLedger();
                   }}
                 >
-                  <Text style={styles.bluetoothRefreshButtonText}>
-                    Connect New Device
-                  </Text>
+                  <Text style={styles.bluetoothRefreshButtonText}>Scan</Text>
                 </TouchableOpacity>
               </View>
             </Pressable>
@@ -2843,7 +2826,7 @@ export default function App() {
                             (w) => w.id !== editingWallet.id
                           );
                           setWallets(updatedWallets);
-                          await saveWallets(updatedWallets);
+                          await saveWalletsToStorage(updatedWallets);
                           editWalletSheetRef.current?.close();
                           setEditingWallet(null);
                         }
@@ -3009,89 +2992,83 @@ export default function App() {
         </Pressable>
       </Modal>
 
-      {/* Ledger Connection Modal */}
-      <Modal visible={showLedgerModal} transparent={true} animationType="slide">
-        <Pressable
-          style={styles.settingsDrawerOverlay}
-          onPress={() => ledgerSheetRef.current?.close()}
-        >
-          <Pressable
-            style={styles.settingsDrawerContent}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={styles.settingsDrawerContentArea}>
-              <View style={styles.settingsDrawerHeader}>
-                <View style={{ width: 32 }} />
-                <Text style={styles.settingsDrawerTitle}>Connect Ledger</Text>
-                <TouchableOpacity
-                  onPress={() => ledgerSheetRef.current?.close()}
-                >
-                  <Text style={styles.settingsDrawerClose}>✕</Text>
-                </TouchableOpacity>
-              </View>
+      {/* Ledger Connection Bottom Sheet */}
+      <BottomSheet
+        ref={ledgerSheetRef}
+        index={-1}
+        snapPoints={snapPoints}
+        enablePanDownToClose={true}
+        backdropComponent={renderBackdrop}
+        backgroundStyle={{ backgroundColor: "#000000" }}
+        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
+      >
+        <BottomSheetView style={styles.bottomSheetContent}>
+          <View style={styles.bottomSheetHeader}>
+            <View style={{ width: 32 }} />
+            <Text style={styles.bottomSheetTitle}>Connect Ledger</Text>
+            <TouchableOpacity onPress={() => ledgerSheetRef.current?.close()}>
+              <Text style={styles.bottomSheetClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
 
-              {ledgerScanning ? (
-                <View style={styles.ledgerStatus}>
-                  <Text style={styles.ledgerStatusText}>
-                    Scanning for Ledger Nano X...
-                  </Text>
-                  <Text style={styles.ledgerStatusSubtext}>
-                    Make sure Bluetooth is on and Solana app is open
-                  </Text>
-                </View>
-              ) : ledgerConnecting ? (
-                <View style={styles.ledgerStatus}>
-                  <Text style={styles.ledgerStatusText}>Connecting...</Text>
-                </View>
-              ) : Array.isArray(ledgerAccounts) && ledgerAccounts.length > 0 ? (
-                <>
-                  <Text style={styles.ledgerAccountsTitle}>
-                    Select an account:
-                  </Text>
-                  <ScrollView style={styles.ledgerAccountsList}>
-                    {ledgerAccounts.map((account) => (
-                      <TouchableOpacity
-                        key={`ledger-${account.index}`}
-                        style={styles.ledgerAccount}
-                        onPress={() => handleSelectLedgerAccount(account)}
-                      >
-                        <View style={styles.ledgerAccountLeft}>
-                          <Image
-                            source={currentNetwork.logo}
-                            style={styles.x1LogoLarge}
-                          />
-                          <View style={styles.ledgerAccountInfo}>
-                            <Text style={styles.ledgerAccountIndex}>
-                              Account {account.index + 1}
-                            </Text>
-                            <Text
-                              style={styles.ledgerAccountAddress}
-                              numberOfLines={1}
-                              ellipsizeMode="middle"
-                            >
-                              {account.address || "Unknown address"}
-                            </Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </>
-              ) : (
-                <View style={styles.ledgerStatus}>
-                  <Text style={styles.ledgerStatusText}>No device found</Text>
-                  <TouchableOpacity
-                    style={styles.confirmButton}
-                    onPress={scanForLedger}
-                  >
-                    <Text style={styles.confirmButtonText}>Scan Again</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+          {ledgerScanning ? (
+            <View style={styles.ledgerStatus}>
+              <Text style={styles.ledgerStatusText}>
+                Scanning for Ledger Nano X...
+              </Text>
+              <Text style={styles.ledgerStatusSubtext}>
+                Make sure Bluetooth is on and Solana app is open
+              </Text>
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          ) : ledgerConnecting ? (
+            <View style={styles.ledgerStatus}>
+              <Text style={styles.ledgerStatusText}>Connecting...</Text>
+            </View>
+          ) : Array.isArray(ledgerAccounts) && ledgerAccounts.length > 0 ? (
+            <>
+              <Text style={styles.ledgerAccountsTitle}>Select an account:</Text>
+              <BottomSheetScrollView style={styles.ledgerAccountsList}>
+                {ledgerAccounts.map((account) => (
+                  <TouchableOpacity
+                    key={`ledger-${account.index}`}
+                    style={styles.ledgerAccount}
+                    onPress={() => handleSelectLedgerAccount(account)}
+                  >
+                    <View style={styles.ledgerAccountLeft}>
+                      <Image
+                        source={currentNetwork.logo}
+                        style={styles.x1LogoLarge}
+                      />
+                      <View style={styles.ledgerAccountInfo}>
+                        <Text style={styles.ledgerAccountIndex}>
+                          Account {account.index + 1}
+                        </Text>
+                        <Text
+                          style={styles.ledgerAccountAddress}
+                          numberOfLines={1}
+                          ellipsizeMode="middle"
+                        >
+                          {account.address || "Unknown address"}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </BottomSheetScrollView>
+            </>
+          ) : (
+            <View style={styles.ledgerStatus}>
+              <Text style={styles.ledgerStatusText}>No device found</Text>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={scanForLedger}
+              >
+                <Text style={styles.confirmButtonText}>Scan Again</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </BottomSheetView>
+      </BottomSheet>
     </GestureHandlerRootView>
   );
 }
