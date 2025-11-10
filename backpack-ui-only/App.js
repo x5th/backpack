@@ -2495,7 +2495,7 @@ export default function App() {
             ]}
           />
         )}
-        backgroundStyle={{ backgroundColor: "#1A1B23" }}
+        backgroundStyle={{ backgroundColor: "#000000" }}
         handleIndicatorStyle={{ backgroundColor: "#4E5056" }}
       >
         {/* Activity List with BottomSheetScrollView */}
@@ -2504,14 +2504,12 @@ export default function App() {
           showsVerticalScrollIndicator={false}
         >
           {/* Header */}
-          <View style={styles.sheetHeader}>
+          <View style={styles.activitySheetHeader}>
             <TouchableOpacity onPress={() => checkTransactions()}>
               <Text style={styles.sheetHeaderButton}>↻</Text>
             </TouchableOpacity>
-            <Text style={styles.sheetTitle}>Activity</Text>
-            <TouchableOpacity onPress={() => activitySheetRef.current?.close()}>
-              <Text style={styles.sheetHeaderButton}>✕</Text>
-            </TouchableOpacity>
+            <Text style={styles.activitySheetTitle}>Activity</Text>
+            <View style={{ width: 32 }} />
           </View>
 
           {/* Transactions List */}
@@ -3136,8 +3134,24 @@ const styles = StyleSheet.create({
   activityContainer: {
     paddingTop: 0,
   },
+  activitySheetHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#2a2a2a",
+  },
+  activitySheetTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
+    flex: 1,
+    textAlign: "center",
+  },
   activityCard: {
-    backgroundColor: "#0a0a0a",
+    backgroundColor: "#2a2a2a",
     borderRadius: 8,
     padding: 16,
     marginHorizontal: 0,
