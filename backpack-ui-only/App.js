@@ -182,6 +182,14 @@ export default function App() {
   const [importMnemonic, setImportMnemonic] = useState("");
   const [importPrivateKey, setImportPrivateKey] = useState("");
   const [importType, setImportType] = useState("mnemonic"); // "mnemonic" or "privateKey"
+  const [showEditWalletModal, setShowEditWalletModal] = useState(false);
+  const [editingWallet, setEditingWallet] = useState(null);
+  const [editWalletName, setEditWalletName] = useState("");
+  const [showPrivateKey, setShowPrivateKey] = useState(false);
+  const [showChangeNameModal, setShowChangeNameModal] = useState(false);
+  const [showViewPrivateKeyModal, setShowViewPrivateKeyModal] = useState(false);
+  const [addressCopied, setAddressCopied] = useState(false);
+  const [copiedWalletId, setCopiedWalletId] = useState(null);
 
   // Ledger states
   const [showLedgerModal, setShowLedgerModal] = useState(false);
@@ -1211,20 +1219,7 @@ export default function App() {
 
       console.log("Connecting to Ledger device:", deviceName);
       console.log("Device ID:", deviceId);
-
-      // Show Solana app instruction alert
-      Alert.alert(
-        "Open Solana App",
-        "Please open the Solana app on your Ledger device.",
-        [{ text: "OK" }],
-        { cancelable: false }
-      );
-
       console.log("Opening BLE transport...");
-
-      // Give user time to read the message and BLE stack time to stabilize
-      console.log("Waiting 3 seconds for BLE stack to stabilize...");
-      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       // Add timeout for connection attempt (60 seconds to allow for pairing)
       const timeoutPromise = new Promise((_, reject) =>
@@ -1662,7 +1657,10 @@ export default function App() {
                 onPress={handleSwap}
               >
                 <View style={styles.actionCircleBg}>
-                  <Text style={styles.actionCircleIcon}>⇄</Text>
+                  <Image
+                    source={require("./assets/swap.png")}
+                    style={styles.swapIcon}
+                  />
                 </View>
                 <Text style={styles.actionCircleText}>Swap</Text>
               </TouchableOpacity>
@@ -1829,7 +1827,7 @@ export default function App() {
                             style={styles.bluetoothDeviceConnectButton}
                             onPress={async () => {
                               setShowBluetoothDrawer(false);
-                              setShowAccountDrawer(true);
+                              setShowLedgerModal(true);
                               setLedgerDeviceId(device.id);
                               // Re-connect to this device
                               await connectToLedger(device);
@@ -1922,22 +1920,33 @@ export default function App() {
                       {wallet.name}
                     </Text>
                     <Text style={styles.bottomSheetWalletAddress}>
-                      {wallet.address}
+                      {copiedWalletId === wallet.id ? "Copied" : wallet.address}
                     </Text>
                   </View>
                 </View>
                 <View style={styles.bottomSheetWalletRight}>
-                  <TouchableOpacity style={styles.bottomSheetCopyBtn}>
+                  <TouchableOpacity
+                    style={styles.bottomSheetCopyBtn}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      Clipboard.setString(wallet.publicKey);
+                      setCopiedWalletId(wallet.id);
+                      setTimeout(() => {
+                        setCopiedWalletId(null);
+                      }, 3000);
+                    }}
+                  >
                     <Text style={styles.bottomSheetCopyIcon}>⧉</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.bottomSheetMoreBtn}
+                    style={styles.bottomSheetEditBtn}
                     onPress={(e) => {
                       e.stopPropagation();
-                      handleDeleteWallet(wallet);
+                      setEditingWallet(wallet);
+                      setShowEditWalletModal(true);
                     }}
                   >
-                    <Text style={styles.bottomSheetMoreText}>⋯</Text>
+                    <Text style={styles.bottomSheetEditIcon}>⋮</Text>
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
@@ -2246,14 +2255,22 @@ export default function App() {
               <View style={styles.receiveAddressContainer}>
                 <Text style={styles.receiveAddressLabel}>Your Address</Text>
                 <Text style={styles.receiveAddressText} numberOfLines={1}>
-                  {selectedWallet?.publicKey || "No wallet selected"}
+                  {addressCopied
+                    ? "Copied"
+                    : selectedWallet?.publicKey || "No wallet selected"}
                 </Text>
               </View>
 
               {/* Copy Button */}
               <TouchableOpacity
                 style={styles.receiveCopyButton}
-                onPress={() => copyToClipboard(selectedWallet.publicKey)}
+                onPress={() => {
+                  copyToClipboard(selectedWallet.publicKey);
+                  setAddressCopied(true);
+                  setTimeout(() => {
+                    setAddressCopied(false);
+                  }, 4000);
+                }}
               >
                 <Text style={styles.receiveCopyButtonText}>Copy Address</Text>
               </TouchableOpacity>
@@ -2431,40 +2448,54 @@ export default function App() {
                       style={styles.activityCard}
                       onPress={() => openExplorer(tx.signature)}
                     >
-                      {/* Header with title and time */}
-                      <View style={styles.activityCardHeader}>
-                        <Text style={styles.activityCardTitle}>
-                          {tx.type === "received" ? "Received" : "Sent"}{" "}
-                          {tx.token}
-                        </Text>
-                        <Text style={styles.activityCardTime}>
-                          {tx.timestamp}
-                        </Text>
-                      </View>
+                      {/* Token logo */}
+                      <Image
+                        source={
+                          tx.token === "XNT"
+                            ? require("./assets/x1.png")
+                            : require("./assets/solana.png")
+                        }
+                        style={styles.activityCardLogo}
+                      />
 
-                      {/* Amount row */}
-                      <View style={styles.activityCardRow}>
-                        <Text style={styles.activityCardLabel}>Amount</Text>
-                        <Text
-                          style={[
-                            styles.activityCardValue,
-                            {
-                              color:
-                                tx.type === "received" ? "#00D084" : "#FF6B6B",
-                            },
-                          ]}
-                        >
-                          {tx.type === "received" ? "+" : "-"}
-                          {tx.amount} {tx.token}
-                        </Text>
-                      </View>
+                      <View style={styles.activityCardContent}>
+                        {/* Header with title and time */}
+                        <View style={styles.activityCardHeader}>
+                          <Text style={styles.activityCardTitle}>
+                            {tx.type === "received" ? "Received" : "Sent"}{" "}
+                            {tx.token}
+                          </Text>
+                          <Text style={styles.activityCardTime}>
+                            {tx.timestamp}
+                          </Text>
+                        </View>
 
-                      {/* Fee row */}
-                      <View style={styles.activityCardRow}>
-                        <Text style={styles.activityCardLabel}>Fee</Text>
-                        <Text style={styles.activityCardValue}>
-                          {tx.fee || "0.000001650"} {tx.token}
-                        </Text>
+                        {/* Amount row */}
+                        <View style={styles.activityCardRow}>
+                          <Text style={styles.activityCardLabel}>Amount</Text>
+                          <Text
+                            style={[
+                              styles.activityCardValue,
+                              {
+                                color:
+                                  tx.type === "received"
+                                    ? "#00D084"
+                                    : "#FF6B6B",
+                              },
+                            ]}
+                          >
+                            {tx.type === "received" ? "+" : "-"}
+                            {tx.amount} {tx.token}
+                          </Text>
+                        </View>
+
+                        {/* Fee row */}
+                        <View style={styles.activityCardRow}>
+                          <Text style={styles.activityCardLabel}>Fee</Text>
+                          <Text style={styles.activityCardValue}>
+                            {tx.fee || "0.000001650"} {tx.token}
+                          </Text>
+                        </View>
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -2679,6 +2710,260 @@ export default function App() {
         </Pressable>
       </Modal>
 
+      {/* Edit Wallet Modal */}
+      <Modal
+        visible={showEditWalletModal}
+        transparent={true}
+        animationType="slide"
+        onShow={() => {
+          if (editingWallet) {
+            setEditWalletName(editingWallet.name);
+          }
+        }}
+      >
+        <Pressable
+          style={styles.settingsDrawerOverlay}
+          onPress={() => {
+            setShowEditWalletModal(false);
+            setEditingWallet(null);
+          }}
+        >
+          <Pressable
+            style={styles.settingsDrawerContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.settingsDrawerContentArea}>
+              <View style={styles.settingsDrawerHeader}>
+                <View style={{ width: 32 }} />
+                <Text style={styles.settingsDrawerTitle}>Edit Wallet</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowEditWalletModal(false);
+                    setEditingWallet(null);
+                  }}
+                >
+                  <Text style={styles.settingsDrawerClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Menu Items */}
+              <ScrollView style={styles.settingsMenuList}>
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => {
+                    setShowEditWalletModal(false);
+                    setShowChangeNameModal(true);
+                  }}
+                >
+                  <Text style={styles.settingsMenuItemText}>
+                    Change Account Name
+                  </Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => {
+                    setShowEditWalletModal(false);
+                    setShowViewPrivateKeyModal(true);
+                  }}
+                >
+                  <Text style={styles.settingsMenuItemText}>
+                    Show Private Key
+                  </Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => {
+                    Alert.alert(
+                      "Delete Account",
+                      `Are you sure you want to delete "${editingWallet?.name}"? This action cannot be undone.`,
+                      [
+                        {
+                          text: "Cancel",
+                          style: "cancel",
+                        },
+                        {
+                          text: "Delete",
+                          style: "destructive",
+                          onPress: async () => {
+                            if (editingWallet) {
+                              const updatedWallets = wallets.filter(
+                                (w) => w.id !== editingWallet.id
+                              );
+                              setWallets(updatedWallets);
+                              await saveWallets(updatedWallets);
+                              setShowEditWalletModal(false);
+                              setEditingWallet(null);
+                            }
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                >
+                  <Text
+                    style={[styles.settingsMenuItemText, { color: "#FF4444" }]}
+                  >
+                    Delete Account
+                  </Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Change Name Modal */}
+      <Modal
+        visible={showChangeNameModal}
+        transparent={true}
+        animationType="slide"
+      >
+        <Pressable
+          style={styles.settingsDrawerOverlay}
+          onPress={() => {
+            console.log("OVERLAY PRESSED - Closing all modals");
+            setShowChangeNameModal(false);
+            setShowEditWalletModal(false);
+            setEditingWallet(null);
+          }}
+        >
+          <Pressable
+            style={styles.settingsDrawerContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.settingsDrawerContentArea}>
+              <View style={styles.settingsDrawerHeader}>
+                <TouchableOpacity
+                  onPress={() => {
+                    console.log("BACK BUTTON PRESSED (<) - Closing all modals");
+                    setShowChangeNameModal(false);
+                    setShowEditWalletModal(false);
+                    setEditingWallet(null);
+                  }}
+                >
+                  <Text style={styles.settingsDrawerClose}>‹</Text>
+                </TouchableOpacity>
+                <Text style={styles.settingsDrawerTitle}>Change Name</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    console.log("X BUTTON PRESSED - Closing all modals");
+                    setShowChangeNameModal(false);
+                    setShowEditWalletModal(false);
+                    setEditingWallet(null);
+                  }}
+                >
+                  <Text style={styles.settingsDrawerClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.inputLabel}>Account Name</Text>
+              <TextInput
+                style={styles.walletNameInput}
+                placeholder="Wallet Name"
+                placeholderTextColor="#666666"
+                value={editWalletName}
+                onChangeText={(text) => {
+                  setEditWalletName(text);
+                  if (editingWallet && text.trim()) {
+                    const updatedWallets = wallets.map((w) =>
+                      w.id === editingWallet.id
+                        ? { ...w, name: text.trim() }
+                        : w
+                    );
+                    setWallets(updatedWallets);
+                    saveWalletsToStorage(updatedWallets);
+                  }
+                }}
+                autoCorrect={false}
+              />
+
+              <TouchableOpacity
+                style={{ paddingVertical: 16, paddingHorizontal: 20 }}
+                onPress={() => {
+                  console.log("SAVE BUTTON PRESSED");
+                  console.log("editingWallet:", editingWallet);
+                  console.log("editWalletName:", editWalletName);
+                  if (editingWallet && editWalletName.trim()) {
+                    console.log("Saving wallet name:", editWalletName.trim());
+                    const updatedWallets = wallets.map((w) =>
+                      w.id === editingWallet.id
+                        ? { ...w, name: editWalletName.trim() }
+                        : w
+                    );
+                    setWallets(updatedWallets);
+                    saveWalletsToStorage(updatedWallets);
+                    console.log("Closing both modals");
+                    setShowChangeNameModal(false);
+                    setShowEditWalletModal(false);
+                    setEditingWallet(null);
+                  } else {
+                    console.log("Not saving - wallet or name is empty");
+                  }
+                }}
+              >
+                <Text
+                  style={[
+                    styles.settingsDrawerTitle,
+                    { fontSize: 18, fontWeight: "600" },
+                  ]}
+                >
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* View Private Key Modal */}
+      <Modal
+        visible={showViewPrivateKeyModal}
+        transparent={true}
+        animationType="slide"
+      >
+        <Pressable
+          style={styles.settingsDrawerOverlay}
+          onPress={() => {
+            setShowViewPrivateKeyModal(false);
+            setShowEditWalletModal(true);
+          }}
+        >
+          <Pressable
+            style={styles.settingsDrawerContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.settingsDrawerContentArea}>
+              <View style={styles.settingsDrawerHeader}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowViewPrivateKeyModal(false);
+                    setShowEditWalletModal(true);
+                  }}
+                >
+                  <Text style={styles.settingsDrawerClose}>‹</Text>
+                </TouchableOpacity>
+                <Text style={styles.settingsDrawerTitle}>Private Key</Text>
+                <View style={{ width: 32 }} />
+              </View>
+
+              {editingWallet && (
+                <View style={styles.privateKeyContainer}>
+                  <Text style={styles.privateKeyLabel}>Private Key:</Text>
+                  <Text style={styles.privateKeyText} selectable={true}>
+                    {editingWallet.privateKey || "Not available"}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Ledger Connection Modal */}
       <Modal visible={showLedgerModal} transparent={true} animationType="slide">
         <Pressable
@@ -2808,6 +3093,17 @@ const styles = StyleSheet.create({
     padding: 16,
     marginHorizontal: 0,
     marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  activityCardLogo: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+  },
+  activityCardContent: {
+    flex: 1,
   },
   activityCardHeader: {
     flexDirection: "row",
@@ -3028,6 +3324,11 @@ const styles = StyleSheet.create({
   actionCircleIcon: {
     fontSize: 24,
     color: "#4A90E2",
+  },
+  swapIcon: {
+    width: 24,
+    height: 24,
+    tintColor: "#4A90E2",
   },
   actionCircleText: {
     fontSize: 12,
@@ -3422,6 +3723,14 @@ const styles = StyleSheet.create({
   },
   bottomSheetMoreText: {
     fontSize: 20,
+    color: "#FFFFFF",
+  },
+  bottomSheetEditBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  bottomSheetEditIcon: {
+    fontSize: 18,
     color: "#FFFFFF",
   },
   bottomSheetAddButton: {
@@ -3847,6 +4156,54 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#FFFFFF",
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#999999",
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  walletNameInput: {
+    backgroundColor: "#0a0a0a",
+    borderRadius: 8,
+    padding: 16,
+    fontSize: 16,
+    color: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#333333",
+  },
+  showPrivateKeyButton: {
+    backgroundColor: "#333333",
+    borderRadius: 8,
+    padding: 16,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  showPrivateKeyButtonText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#FFFFFF",
+  },
+  privateKeyContainer: {
+    backgroundColor: "#0a0a0a",
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: "#333333",
+  },
+  privateKeyLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#999999",
+    marginBottom: 8,
+  },
+  privateKeyText: {
+    fontSize: 12,
+    fontFamily: "monospace",
+    color: "#FFFFFF",
+    lineHeight: 18,
   },
   importTypeToggle: {
     flexDirection: "row",
