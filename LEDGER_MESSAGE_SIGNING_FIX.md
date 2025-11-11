@@ -127,9 +127,26 @@ const ledgerSignature = await solana.signTransaction(
 ); // ❌ FAILS with "Invalid tag 8"
 ```
 
-## Message Signing Workaround
+## Why Not Use `signOffchainMessage()` Like The Extension?
 
-Since Ledger doesn't support arbitrary message signing (`signOffchainMessage()` fails with error 0x6a81), we use a transaction-based workaround:
+**Important Discovery**: The Backpack browser extension DOES use `signOffchainMessage()` for Ledger message signing - but only because it uses USB connection (`TransportWebHid`).
+
+### Transport Layer Differences
+
+| Feature                     | Extension (USB)   | Mobile (BLE)            |
+| --------------------------- | ----------------- | ----------------------- |
+| **Transport**               | `TransportWebHid` | `TransportBLE`          |
+| **Connection**              | USB cable         | Bluetooth               |
+| **`signOffchainMessage()`** | ✅ Works          | ❌ Fails (error 0x6a81) |
+| **`signTransaction()`**     | ✅ Works          | ✅ Works                |
+
+**Testing confirmed**: Even with proper initialization via `getAddress()`, `signOffchainMessage()` fails over BLE with error 0x6a81 (UNKNOWN_ERROR). This is a Ledger firmware/transport limitation - the Solana app doesn't expose off-chain message signing over Bluetooth.
+
+**Extension code reference**: See `packages/secure-ui/src/RequestHandlers/LedgerRequests/LedgerSignRequest.tsx:195-232` where the extension successfully uses `solana.signOffchainMessage()` over USB.
+
+## Message Signing Workaround (BLE Only)
+
+Since Ledger doesn't support arbitrary message signing over Bluetooth (`signOffchainMessage()` fails with error 0x6a81), we use a transaction-based workaround:
 
 1. Create a 0-lamport transfer transaction to yourself
 2. Sign this transaction with Ledger
@@ -139,8 +156,11 @@ Since Ledger doesn't support arbitrary message signing (`signOffchainMessage()` 
 
 - ✅ Completely free (0 lamports transferred, never sent to network)
 - ✅ Proves wallet ownership
-- ✅ Works with Ledger hardware wallets
+- ✅ Works with Ledger hardware wallets over BLE
 - ✅ Same security as transaction signing
+- ✅ No blockchain footprint (transaction never broadcast)
+
+**Important**: This transaction is **NEVER sent to the blockchain**. We only use `signTransaction()` to get a signature from the Ledger device. There is NO call to `sendRawTransaction()` or `sendTransaction()`. The signed transaction exists only in memory and is immediately discarded after extracting the signature.
 
 ## Implementation Location
 

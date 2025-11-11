@@ -1166,9 +1166,15 @@ export default function App() {
                 console.log("Using derivation path:", derivationPath);
 
                 // Get the public key from Ledger to verify connection
+                // CRITICAL: This initializes the Ledger app state
                 console.log("Getting public key from Ledger...");
                 const ledgerPubKey = await solana.getAddress(derivationPath);
                 console.log("Ledger public key:", ledgerPubKey.address);
+
+                // NOTE: signOffchainMessage() is not supported over BLE
+                // The extension uses it over USB (TransportWebHid), but
+                // BLE (TransportBLE) doesn't support this API.
+                // We use a transaction-based approach instead.
 
                 // Create a connection to X1 network
                 const x1Connection = new Connection(
@@ -1184,6 +1190,7 @@ export default function App() {
                   await x1Connection.getLatestBlockhash("finalized");
 
                 // Create a simple transfer transaction (0 lamports to self)
+                // This is completely free and never sent to the blockchain
                 const dummyTx = new Transaction({
                   recentBlockhash: blockhash,
                   feePayer: publicKey,
@@ -1216,7 +1223,7 @@ export default function App() {
                 await transport.close();
                 console.log("Ledger disconnected");
 
-                // Return the signature
+                // Return the signature (transaction is NEVER sent to network)
                 result = {
                   signature: Buffer.from(ledgerSignature.signature).toString(
                     "base64"
