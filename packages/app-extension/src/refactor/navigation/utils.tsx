@@ -10,6 +10,7 @@ import type { StackNavigationOptions } from "@react-navigation/stack";
 import { CloseButton } from "../../components/common/Layout/Drawer";
 import { WalletDrawerButton } from "../../components/common/WalletList";
 import { SettingsButton } from "../../components/Unlocked/Settings";
+import { AvatarPopoverButton } from "../../components/Unlocked/Settings/AvatarPopover";
 
 import { Routes as WalletsNavigatorRoutes } from "./WalletsNavigator";
 
@@ -189,9 +190,10 @@ export function rootNavHeaderOptions({ navigation }: { navigation: any }): any {
   return {
     title: "",
     headerTitleAlign: "center",
+    headerTitle: () => <ActiveWalletDrawerButton navigation={navigation} />,
     headerLeft: () => (
       <NavButtonContainer>
-        <ActiveWalletDrawerButton navigation={navigation} />
+        <AvatarPopoverButton />
       </NavButtonContainer>
     ),
     headerRight: () => (

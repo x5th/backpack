@@ -214,32 +214,42 @@ function WalletButton({
           }}
         >
           {showIcon ? (
-            <div
-              style={{
-                width: "15px",
-                marginLeft: "6px",
-                marginRight: "6px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                cursor: switching ? "not-allowed" : "pointer",
-                opacity: switching ? 0.6 : 1,
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!switching) {
-                  setIsNetworkOpen(!isNetworkOpen);
-                }
-              }}
-            >
-              <ProxyImage
-                noSkeleton
-                src={iconUrl}
+            <>
+              <div
                 style={{
                   width: "15px",
+                  marginLeft: "6px",
+                  marginRight: "6px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  cursor: switching ? "not-allowed" : "pointer",
+                  opacity: switching ? 0.6 : 1,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!switching) {
+                    setIsNetworkOpen(!isNetworkOpen);
+                  }
+                }}
+              >
+                <ProxyImage
+                  noSkeleton
+                  src={iconUrl}
+                  style={{
+                    width: "15px",
+                  }}
+                />
+              </div>
+              <div
+                style={{
+                  borderLeft: theme.baseBorderMed.val,
+                  borderLeftWidth: "1px",
+                  borderLeftStyle: "solid",
+                  marginRight: "6px",
                 }}
               />
-            </div>
+            </>
           ) : null}
           <div
             style={{
@@ -280,8 +290,9 @@ function WalletButton({
       </MuiButton>
 
       {/* Network Dropdown */}
-      {isNetworkOpen ? <div
-        style={{
+      {isNetworkOpen ? (
+        <div
+          style={{
             position: "absolute",
             top: "calc(100% + 4px)",
             left: 0,
@@ -293,34 +304,35 @@ function WalletButton({
             minWidth: "120px",
           }}
         >
-        <div
-          style={{
+          <div
+            style={{
               display: "flex",
               alignItems: "center",
               gap: "8px",
               padding: "6px 10px",
               cursor: "pointer",
             }}
-          onClick={(e) => handleNetworkSwitch(!isX1Network, e)}
+            onClick={(e) => handleNetworkSwitch(!isX1Network, e)}
           >
-          <img
-            src={isX1Network ? "./solana.png" : "./x1.png"}
-            alt={isX1Network ? "Solana" : "X1"}
-            style={{
+            <img
+              src={isX1Network ? "./solana.png" : "./x1.png"}
+              alt={isX1Network ? "Solana" : "X1"}
+              style={{
                 width: "20px",
                 height: "20px",
               }}
             />
-          <span
-            style={{
+            <span
+              style={{
                 fontSize: "14px",
                 color: theme.baseTextMedEmphasis.val,
               }}
             >
-            {isX1Network ? "Solana" : "X1"}
-          </span>
+              {isX1Network ? "Solana" : "X1"}
+            </span>
+          </div>
         </div>
-      </div> : null}
+      ) : null}
     </div>
   );
 }
