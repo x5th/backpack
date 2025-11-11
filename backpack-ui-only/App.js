@@ -1664,7 +1664,7 @@ export default function App() {
       name: `Ledger ${account.index + 1}`,
       address: account.address.slice(0, 4) + "..." + account.address.slice(-4),
       publicKey: account.address,
-      selected: false,
+      selected: true, // Set new wallet as selected
       isLedger: true,
       derivationPath: account.derivationPath,
       ledgerDeviceId: ledgerDeviceId, // Store device ID for later signing
@@ -1674,9 +1674,16 @@ export default function App() {
     console.log("Wallet ledgerDeviceId field:", newWallet.ledgerDeviceId);
     console.log("=== END ADDING LEDGER WALLET ===");
 
-    const updatedWallets = [...wallets, newWallet];
+    // Deselect all existing wallets and add new wallet as selected
+    const updatedWallets = [
+      ...wallets.map((w) => ({ ...w, selected: false })),
+      newWallet,
+    ];
     setWallets(updatedWallets);
     await saveWalletsToStorage(updatedWallets);
+
+    // Set the new wallet as the selected wallet
+    setSelectedWallet(newWallet);
 
     ledgerSheetRef.current?.close();
     setLedgerAccounts([]);
