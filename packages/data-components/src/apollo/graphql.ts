@@ -1,16 +1,19 @@
 // GraphQL Types for Backpack API
 export type ProviderId =
-  | "SOLANA-mainnet"
-  | "SOLANA-devnet"
-  | "SOLANA-testnet"
-  | "ETHEREUM-mainnet"
-  | "ETHEREUM-goerli"
-  | "ETHEREUM-sepolia"
-  | "X1-mainnet"
-  | "X1-testnet"
-  | "SOLANA"  // Legacy format for backward compatibility
-  | "ETHEREUM"  // Legacy format for backward compatibility
-  | "X1";  // Legacy format for backward compatibility
+  // Backpack GraphQL API (https://backpack-api.xnfts.dev/v2/graphql) accepts:
+  | "SOLANA"       // ✅ For all Solana networks (mainnet/devnet/testnet)
+  | "ETHEREUM"     // ✅ For all Ethereum networks
+  // X1 REST API (http://162.250.126.66:4000) accepts:
+  | "X1"           // ✅ X1 blockchain (legacy format)
+  | "X1-mainnet"   // ✅ X1 mainnet (with network suffix)
+  | "X1-testnet"   // ✅ X1 testnet (with network suffix)
+  // TypeScript compatibility (NOT accepted by Backpack GraphQL API):
+  | "SOLANA-mainnet"   // ⚠️ Type-only, use "SOLANA" for actual API calls
+  | "SOLANA-devnet"    // ⚠️ Type-only, use "SOLANA" for actual API calls
+  | "SOLANA-testnet"   // ⚠️ Type-only, use "SOLANA" for actual API calls
+  | "ETHEREUM-mainnet" // ⚠️ Type-only, use "ETHEREUM" for actual API calls
+  | "ETHEREUM-goerli"  // ⚠️ Type-only, use "ETHEREUM" for actual API calls
+  | "ETHEREUM-sepolia";// ⚠️ Type-only, use "ETHEREUM" for actual API calls
 
 export type GetTokenBalancesQueryVariables = {
   address: string;

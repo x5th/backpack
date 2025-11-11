@@ -148,26 +148,19 @@ function _TokenBalances({
   const isSolanaNetwork = blockchain === Blockchain.SOLANA;
   const isX1Network = blockchain === Blockchain.X1;
 
-  // Determine the correct providerId based on connection URL
+  // Determine the correct providerId based on blockchain
   let finalProviderId = providerId;
-  if (connectionUrl) {
-    if (connectionUrl.includes("solana")) {
-      if (
-        connectionUrl.includes("mainnet") ||
-        connectionUrl.includes("solana-mainnet")
-      ) {
-        finalProviderId = "SOLANA-mainnet" as ProviderId;
-      } else if (connectionUrl.includes("devnet")) {
-        finalProviderId = "SOLANA-devnet" as ProviderId;
-      } else if (connectionUrl.includes("testnet")) {
-        finalProviderId = "SOLANA-testnet" as ProviderId;
-      }
-    } else if (connectionUrl.includes("x1.xyz")) {
-      if (connectionUrl.includes("testnet")) {
-        finalProviderId = "X1-testnet" as ProviderId;
-      } else if (connectionUrl.includes("mainnet")) {
-        finalProviderId = "X1-mainnet" as ProviderId;
-      }
+
+  // For Solana: Use simple "SOLANA" - Backpack GraphQL API doesn't support network suffixes
+  if (blockchain === Blockchain.SOLANA) {
+    finalProviderId = "SOLANA" as ProviderId;
+  }
+  // For X1: Detect network from connection URL (X1 REST API supports network suffixes)
+  else if (connectionUrl && connectionUrl.includes("x1.xyz")) {
+    if (connectionUrl.includes("testnet")) {
+      finalProviderId = "X1-testnet" as ProviderId;
+    } else if (connectionUrl.includes("mainnet")) {
+      finalProviderId = "X1-mainnet" as ProviderId;
     }
   }
 
