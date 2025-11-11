@@ -217,7 +217,7 @@ function WalletButton({
             <>
               <div
                 style={{
-                  width: "15px",
+                  width: "19px",
                   marginLeft: "6px",
                   marginRight: "6px",
                   display: "flex",
@@ -237,7 +237,7 @@ function WalletButton({
                   noSkeleton
                   src={iconUrl}
                   style={{
-                    width: "15px",
+                    width: "19px",
                   }}
                 />
               </div>
@@ -318,8 +318,8 @@ function WalletButton({
               src={isX1Network ? "./solana.png" : "./x1.png"}
               alt={isX1Network ? "Solana" : "X1"}
               style={{
-                width: "20px",
-                height: "20px",
+                width: "25px",
+                height: "25px",
               }}
             />
             <span
