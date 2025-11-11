@@ -133,13 +133,20 @@ function _TokenBalances({
     hiddenTokenAddresses(providerId.toLowerCase() as Blockchain)
   );
 
-  // Get connection URL to detect which network we're on
-  const connectionUrl = useBlockchainConnectionUrl(Blockchain.X1);
+  // Determine blockchain from providerId
+  const blockchain = providerId.includes("SOLANA")
+    ? Blockchain.SOLANA
+    : providerId.includes("ETHEREUM")
+    ? Blockchain.ETHEREUM
+    : Blockchain.X1;
+
+  // Get connection URL for the correct blockchain
+  const connectionUrl = useBlockchainConnectionUrl(blockchain);
   const apiUrl = useRecoilValue(backendApiUrl);
 
   // Detect if this is a Solana network or X1 network
-  const isSolanaNetwork = connectionUrl?.includes("solana") || false;
-  const isX1Network = connectionUrl?.includes("x1.xyz") || false;
+  const isSolanaNetwork = blockchain === Blockchain.SOLANA;
+  const isX1Network = blockchain === Blockchain.X1;
 
   // Determine the correct providerId based on connection URL
   let finalProviderId = providerId;
