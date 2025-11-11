@@ -28,14 +28,5 @@ export const Finish = ({ isAddingAccount }: { isAddingAccount?: boolean }) => {
     }
   }, [isAddingAccount, onboardingData, createStore, setLoading]);
 
-  return !loading ? (
-    <SetupComplete
-      onClose={() => {
-        // Close the onboarding window - user can access extension from toolbar
-        window.close();
-      }}
-    />
-  ) : (
-    <Loader />
-  );
+  return !loading ? <SetupComplete /> : <Loader />;
 };
