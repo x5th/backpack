@@ -54,6 +54,7 @@ import QRCode from "react-native-qrcode-svg";
 import TransportBLE from "@ledgerhq/react-native-hw-transport-ble";
 import AppSolana from "@ledgerhq/hw-app-solana";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { WebView } from "react-native-webview";
 
 // Import native USB Ledger module
 const { LedgerUsb } = NativeModules;
@@ -197,6 +198,7 @@ export default function App() {
   const [ledgerScanning, setLedgerScanning] = useState(false);
   const [ledgerAccounts, setLedgerAccounts] = useState([]);
   const [ledgerConnecting, setLedgerConnecting] = useState(false);
+  const [ledgerDeviceName, setLedgerDeviceName] = useState(null);
   const [ledgerDeviceId, setLedgerDeviceId] = useState(null); // Store device ID to skip scanning
   const [ledgerDeviceInfo, setLedgerDeviceInfo] = useState(null); // Store device info (name, id)
   const [ledgerConnectionType, setLedgerConnectionType] = useState("usb"); // 'usb' or 'bluetooth'
@@ -213,6 +215,15 @@ export default function App() {
   const [sendSignature, setSendSignature] = useState("");
   const [sendError, setSendError] = useState("");
 
+  // Browser/WebView states
+  const [browserUrl, setBrowserUrl] = useState(
+    "http://162.250.126.66:4000/test"
+  );
+  const [browserInputUrl, setBrowserInputUrl] = useState(
+    "http://162.250.126.66:4000/test"
+  );
+  const webViewRef = useRef(null);
+
   // Bottom sheet refs
   const bottomSheetRef = useRef(null);
   const sendSheetRef = useRef(null);
@@ -224,6 +235,7 @@ export default function App() {
   const addressSheetRef = useRef(null);
   const ledgerSheetRef = useRef(null);
   const editWalletSheetRef = useRef(null);
+  const browserSheetRef = useRef(null);
 
   const snapPoints = useMemo(() => ["50%", "90%"], []);
 
@@ -870,6 +882,195 @@ export default function App() {
     Clipboard.setString(selectedWallet.publicKey);
   };
 
+  // Browser WebView message handler
+  const handleWebViewMessage = async (event) => {
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+      console.log("WebView message received:", message);
+
+      const { id, method, params } = message;
+
+      let result;
+      let error;
+
+      try {
+        switch (method) {
+          case "connect":
+            // Return the wallet's public key
+            if (!selectedWallet) {
+              throw new Error("No wallet selected");
+            }
+            result = {
+              publicKey: selectedWallet.publicKey,
+            };
+            break;
+
+          case "signAndSendTransaction":
+            if (!selectedWallet) {
+              throw new Error("No wallet selected");
+            }
+
+            // Get transaction from params
+            const { transaction: txData, options } = params;
+
+            // Create connection to X1 network
+            const x1Connection = new Connection("https://rpc.mainnet.x1.xyz");
+
+            // Deserialize the transaction
+            const txBuffer = Buffer.from(txData, "base64");
+            const transaction = Transaction.from(txBuffer);
+
+            // Get the wallet's data
+            const selectedWalletData = wallets.find(
+              (w) => w.id === selectedWallet.id
+            );
+
+            // Get the from public key
+            const fromPubkey = new PublicKey(selectedWallet.publicKey);
+
+            // Sign the transaction
+            if (selectedWalletData && selectedWalletData.isLedger) {
+              // Sign with Ledger
+              console.log("Signing transaction with Ledger...");
+
+              const deviceId = selectedWalletData.ledgerDeviceId;
+              if (!deviceId) {
+                throw new Error(
+                  "Ledger device ID not found. Please reconnect your Ledger."
+                );
+              }
+
+              // Connect to Ledger via BLE
+              const transport = await TransportBLE.open(deviceId);
+              const solana = new AppSolana(transport);
+
+              // Get the derivation path for this wallet
+              const derivationPath = selectedWalletData.derivationPath;
+              console.log("Using derivation path:", derivationPath);
+
+              // Sign the transaction with Ledger
+              const serializedTx = transaction.serializeMessage();
+              const signature = await solana.signTransaction(
+                derivationPath,
+                serializedTx
+              );
+
+              console.log("Ledger signature obtained");
+
+              // Add the signature to the transaction
+              transaction.addSignature(
+                fromPubkey,
+                Buffer.from(signature.signature)
+              );
+
+              // Disconnect from Ledger
+              await transport.close();
+              console.log("Ledger disconnected");
+            } else {
+              // Sign with keypair for regular wallets
+              if (!selectedWalletData || !selectedWalletData.keypair) {
+                throw new Error(
+                  "Wallet keypair not found. Please make sure you created or imported this wallet."
+                );
+              }
+
+              const keypair = selectedWalletData.keypair;
+              console.log("Signing transaction with keypair...");
+              transaction.sign(keypair);
+            }
+
+            // Send transaction
+            console.log("Sending transaction to X1 network...");
+            const txSignature = await x1Connection.sendRawTransaction(
+              transaction.serialize()
+            );
+
+            console.log("Transaction sent! Signature:", txSignature);
+
+            // Return the signature
+            result = {
+              signature: txSignature,
+            };
+            break;
+
+          case "signMessage":
+            if (!selectedWallet) {
+              throw new Error("No wallet selected");
+            }
+
+            const { encodedMessage } = params;
+            const messageBuffer = Buffer.from(encodedMessage, "base64");
+
+            // Get the wallet's data for signing
+            const walletData = wallets.find((w) => w.id === selectedWallet.id);
+
+            if (walletData && walletData.isLedger) {
+              // Sign with Ledger
+              console.log("Signing message with Ledger...");
+
+              const deviceId = walletData.ledgerDeviceId;
+              if (!deviceId) {
+                throw new Error(
+                  "Ledger device ID not found. Please reconnect your Ledger."
+                );
+              }
+
+              // Connect to Ledger via BLE
+              const transport = await TransportBLE.open(deviceId);
+              const solana = new AppSolana(transport);
+
+              // Get the derivation path
+              const derivationPath = walletData.derivationPath;
+
+              // Sign the message with Ledger
+              const signature = await solana.signOffchainMessage(
+                derivationPath,
+                messageBuffer
+              );
+
+              // Disconnect from Ledger
+              await transport.close();
+
+              result = {
+                signature: Buffer.from(signature.signature).toString("base64"),
+              };
+            } else {
+              // Sign with keypair for regular wallets
+              if (!walletData || !walletData.keypair) {
+                throw new Error(
+                  "Wallet keypair not found. Please make sure you created or imported this wallet."
+                );
+              }
+
+              const keypair = walletData.keypair;
+              const signature = keypair.sign(messageBuffer);
+
+              result = {
+                signature: Buffer.from(signature).toString("base64"),
+              };
+            }
+            break;
+
+          default:
+            throw new Error(`Unknown method: ${method}`);
+        }
+      } catch (err) {
+        console.error("Error processing WebView message:", err);
+        error = err.message || "Unknown error";
+      }
+
+      // Send response back to WebView
+      const response = JSON.stringify({ id, result, error });
+      const jsCode = `
+        window.postMessage(${response}, '*');
+        true;
+      `;
+      webViewRef.current?.injectJavaScript(jsCode);
+    } catch (err) {
+      console.error("Error parsing WebView message:", err);
+    }
+  };
+
   // Wallet management functions
   const handleAddWallet = () => {
     setShowAddWalletModal(true);
@@ -1254,6 +1455,12 @@ export default function App() {
             }
 
             setLedgerScanning(false);
+
+            // Store device name for UI display
+            const deviceName =
+              device.deviceName || device.name || "Ledger Device";
+            setLedgerDeviceName(deviceName);
+            console.log("Device name:", deviceName);
 
             // Wait for BLE stack to settle after scan cleanup before connecting
             console.log(
@@ -1890,6 +2097,19 @@ export default function App() {
                   <Text style={styles.actionCircleIcon}>◈</Text>
                 </View>
                 <Text style={styles.actionCircleText}>Stake</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionCircle}
+                onPress={() => {
+                  console.log("Browser button pressed, expanding sheet");
+                  browserSheetRef.current?.expand();
+                }}
+              >
+                <View style={styles.actionCircleBg}>
+                  <Text style={styles.actionCircleIcon}>🌐</Text>
+                </View>
+                <Text style={styles.actionCircleText}>Browser</Text>
               </TouchableOpacity>
             </View>
 
@@ -3118,16 +3338,18 @@ export default function App() {
 
           {ledgerScanning ? (
             <View style={styles.ledgerStatus}>
-              <Text style={styles.ledgerStatusText}>
-                Scanning for Ledger Nano X...
-              </Text>
+              <Text style={styles.ledgerStatusText}>Scanning...</Text>
               <Text style={styles.ledgerStatusSubtext}>
                 Make sure Bluetooth is on and Solana app is open
               </Text>
             </View>
           ) : ledgerConnecting ? (
             <View style={styles.ledgerStatus}>
-              <Text style={styles.ledgerStatusText}>Connecting...</Text>
+              <Text style={styles.ledgerStatusText}>
+                {ledgerDeviceName
+                  ? `Connecting to ${ledgerDeviceName}...`
+                  : "Connecting..."}
+              </Text>
             </View>
           ) : Array.isArray(ledgerAccounts) && ledgerAccounts.length > 0 ? (
             <>
@@ -3163,15 +3385,207 @@ export default function App() {
             </>
           ) : (
             <View style={styles.ledgerStatus}>
-              <Text style={styles.ledgerStatusText}>No device found</Text>
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={scanForLedger}
-              >
-                <Text style={styles.confirmButtonText}>Scan Again</Text>
-              </TouchableOpacity>
+              <Text style={styles.ledgerStatusText}>Scanning...</Text>
             </View>
           )}
+        </BottomSheetView>
+      </BottomSheet>
+
+      {/* Browser BottomSheet */}
+      <BottomSheet
+        ref={browserSheetRef}
+        index={-1}
+        snapPoints={["90%"]}
+        enablePanDownToClose={true}
+        backdropComponent={(props) => (
+          <BottomSheetBackdrop
+            {...props}
+            disappearsOnIndex={-1}
+            appearsOnIndex={0}
+            opacity={0.5}
+          />
+        )}
+      >
+        <BottomSheetView style={{ flex: 1 }}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Browser</Text>
+            <TouchableOpacity onPress={() => browserSheetRef.current?.close()}>
+              <Text style={styles.closeButton}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* URL Input */}
+          <View style={styles.urlInputContainer}>
+            <TextInput
+              style={styles.urlInput}
+              value={browserInputUrl}
+              onChangeText={(text) => {
+                console.log("URL input changed:", text);
+                setBrowserInputUrl(text);
+              }}
+              placeholder="Enter URL"
+              placeholderTextColor="#666"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              style={styles.goButton}
+              onPress={() => {
+                console.log("Go button pressed! Loading URL:", browserInputUrl);
+
+                // Sanitize and validate URL
+                let url = browserInputUrl.trim();
+
+                // Add protocol if missing
+                if (
+                  url &&
+                  !url.startsWith("http://") &&
+                  !url.startsWith("https://")
+                ) {
+                  url = "https://" + url;
+                }
+
+                // Remove spaces (common typo)
+                url = url.replace(/\s+/g, "");
+
+                console.log("Sanitized URL:", url);
+                setBrowserUrl(url);
+                console.log("browserUrl state updated to:", url);
+              }}
+            >
+              <Text style={styles.goButtonText}>Go</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* WebView */}
+          <View style={{ flex: 1, backgroundColor: "#FF0000", marginTop: 10 }}>
+            <WebView
+              source={{ uri: browserUrl }}
+              style={{ flex: 1, backgroundColor: "#00FF00" }}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              onMessage={handleWebViewMessage}
+              injectedJavaScriptBeforeContentLoaded={`
+                (function() {
+                  // Create a promise-based request system
+                  let requestId = 0;
+                  const pendingRequests = {};
+
+                  // Listen for responses from React Native
+                  window.addEventListener('message', (event) => {
+                    try {
+                      const response = typeof event.data === 'string'
+                        ? JSON.parse(event.data)
+                        : event.data;
+
+                      if (response.id && pendingRequests[response.id]) {
+                        const { resolve, reject } = pendingRequests[response.id];
+
+                        if (response.error) {
+                          reject(new Error(response.error));
+                        } else {
+                          resolve(response.result);
+                        }
+
+                        delete pendingRequests[response.id];
+                      }
+                    } catch (err) {
+                      console.error('Error processing message:', err);
+                    }
+                  });
+
+                  // Helper function to send requests to React Native
+                  function sendRequest(method, params = {}) {
+                    return new Promise((resolve, reject) => {
+                      const id = ++requestId;
+                      pendingRequests[id] = { resolve, reject };
+
+                      const message = JSON.stringify({ id, method, params });
+                      window.ReactNativeWebView.postMessage(message);
+
+                      // Timeout after 30 seconds
+                      setTimeout(() => {
+                        if (pendingRequests[id]) {
+                          delete pendingRequests[id];
+                          reject(new Error('Request timeout'));
+                        }
+                      }, 30000);
+                    });
+                  }
+
+                  // Create the window.x1 API
+                  window.x1 = {
+                    // Connect to the wallet and get public key
+                    connect: async function() {
+                      try {
+                        const result = await sendRequest('connect');
+                        return result.publicKey;
+                      } catch (err) {
+                        console.error('x1.connect error:', err);
+                        throw err;
+                      }
+                    },
+
+                    // Sign and send a transaction
+                    signAndSendTransaction: async function(transaction, options = {}) {
+                      try {
+                        // Serialize the transaction to base64
+                        let txData;
+                        if (transaction.serialize) {
+                          // If it's a Transaction object
+                          txData = transaction.serialize({
+                            requireAllSignatures: false,
+                            verifySignatures: false
+                          }).toString('base64');
+                        } else if (transaction instanceof Uint8Array) {
+                          // If it's already serialized
+                          txData = btoa(String.fromCharCode.apply(null, transaction));
+                        } else {
+                          throw new Error('Invalid transaction format');
+                        }
+
+                        const result = await sendRequest('signAndSendTransaction', {
+                          transaction: txData,
+                          options
+                        });
+
+                        return result.signature;
+                      } catch (err) {
+                        console.error('x1.signAndSendTransaction error:', err);
+                        throw err;
+                      }
+                    },
+
+                    // Sign a message
+                    signMessage: async function(message) {
+                      try {
+                        // Encode the message to base64
+                        let encodedMessage;
+                        if (typeof message === 'string') {
+                          encodedMessage = btoa(message);
+                        } else if (message instanceof Uint8Array) {
+                          encodedMessage = btoa(String.fromCharCode.apply(null, message));
+                        } else {
+                          throw new Error('Invalid message format');
+                        }
+
+                        const result = await sendRequest('signMessage', {
+                          encodedMessage
+                        });
+
+                        return result.signature;
+                      } catch (err) {
+                        console.error('x1.signMessage error:', err);
+                        throw err;
+                      }
+                    }
+                  };
+
+                  console.log('window.x1 API initialized');
+                })();
+              `}
+            />
+          </View>
         </BottomSheetView>
       </BottomSheet>
     </GestureHandlerRootView>
@@ -4478,5 +4892,63 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#888888",
     fontFamily: "monospace",
+  },
+  // Browser styles
+  sheetHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#222222",
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
+  closeButton: {
+    fontSize: 24,
+    color: "#888888",
+    fontWeight: "300",
+  },
+  urlInputContainer: {
+    flexDirection: "row",
+    marginBottom: 16,
+    gap: 8,
+  },
+  urlInput: {
+    flex: 1,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: "#FFFFFF",
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: "#333333",
+  },
+  goButton: {
+    backgroundColor: "#4A90E2",
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  goButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  webViewContainer: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  webView: {
+    flex: 1,
   },
 });
