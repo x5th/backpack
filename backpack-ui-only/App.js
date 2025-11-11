@@ -160,12 +160,14 @@ export default function App() {
   const [selectedWallet, setSelectedWallet] = useState(null);
   const [accounts, setAccounts] = useState(MOCK_ACCOUNTS);
   const [selectedAccount, setSelectedAccount] = useState(MOCK_ACCOUNTS[0]);
-  const [balance, setBalance] = useState("30,449.46");
-  const [balanceUSD, setBalanceUSD] = useState("$30,449.46");
+  const [balance, setBalance] = useState("0");
+  const [balanceUSD, setBalanceUSD] = useState("$0.00");
+  const [tokenPrice, setTokenPrice] = useState(null);
   const [tokens, setTokens] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [balanceCache, setBalanceCache] = useState({});
   const [currentNetwork, setCurrentNetwork] = useState(NETWORKS[0]);
+  const [isOnline, setIsOnline] = useState(true);
 
   // Network selector states
   const [showDebugDrawer, setShowDebugDrawer] = useState(false);
@@ -299,6 +301,15 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [hasCheckedNetwork]);
 
+  // Monitor network status continuously
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      setIsOnline(state.isConnected && state.isInternetReachable);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // Override console.log to capture logs
   useEffect(() => {
     const originalLog = console.log;
@@ -349,6 +360,7 @@ export default function App() {
         setBalance(cached.balance);
         setBalanceUSD(cached.balanceUSD);
         setTokens(cached.tokens);
+        setTokenPrice(cached.tokenPrice);
         console.log("Loaded balance from cache for", activeNetwork.name);
       }
 
@@ -375,6 +387,9 @@ export default function App() {
             })}`
           : "$0.00";
 
+        // Extract the price from the native token (first token)
+        const price = data.tokens[0]?.price || 0;
+
         const formattedTokens = data.tokens.map((token, idx) => ({
           id: String(idx + 1),
           name: token.symbol,
@@ -392,6 +407,7 @@ export default function App() {
 
         setBalance(balanceStr);
         setBalanceUSD(usdStr);
+        setTokenPrice(price);
         setTokens(formattedTokens);
 
         // Save to cache
@@ -400,6 +416,7 @@ export default function App() {
           [cacheKey]: {
             balance: balanceStr,
             balanceUSD: usdStr,
+            tokenPrice: price,
             tokens: formattedTokens,
           },
         }));
@@ -1755,6 +1772,21 @@ export default function App() {
 
           {/* Activity and Settings icons on the right */}
           <View style={styles.topBarRightIcons}>
+            {/* Offline indicator */}
+            {!isOnline && (
+              <TouchableOpacity
+                style={styles.offlineIndicator}
+                onPress={() => {
+                  if (Platform.OS === "android") {
+                    Linking.sendIntent("android.settings.WIFI_SETTINGS");
+                  } else {
+                    Linking.openURL("app-settings:");
+                  }
+                }}
+              >
+                <Text style={styles.offlineIcon}>📡</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.activityIcon}
               onPress={() => activitySheetRef.current?.expand()}
@@ -1795,7 +1827,17 @@ export default function App() {
             {/* Balance display */}
             <View style={styles.balanceContent}>
               <Text style={styles.balanceUSD}>{balanceUSD}</Text>
-              <Text style={styles.balanceChange}>$0.00 0%</Text>
+              <Text style={styles.balanceChange}>
+                {tokenPrice !== null
+                  ? `${getNativeTokenInfo().symbol} $${tokenPrice.toLocaleString(
+                      "en-US",
+                      {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }
+                    )}`
+                  : "$0.00"}
+              </Text>
             </View>
 
             {/* Action Buttons */}
@@ -2256,10 +2298,14 @@ export default function App() {
               style={styles.settingsMenuItem}
               onPress={() => {
                 settingsSheetRef.current?.close();
-                Alert.alert("Settings", "Settings would open here");
+                if (Platform.OS === "android") {
+                  Linking.sendIntent("android.settings.WIFI_SETTINGS");
+                } else {
+                  Linking.openURL("app-settings:");
+                }
               }}
             >
-              <Text style={styles.settingsMenuItemText}>Settings</Text>
+              <Text style={styles.settingsMenuItemText}>WiFi Settings</Text>
               <Text style={styles.settingsMenuItemArrow}>›</Text>
             </TouchableOpacity>
 
@@ -3343,6 +3389,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     alignItems: "center",
+  },
+  offlineIndicator: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  offlineIcon: {
+    fontSize: 18,
+    opacity: 0.6,
   },
   activityIcon: {
     width: 32,
