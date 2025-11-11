@@ -29,6 +29,7 @@ import {
   Platform,
   NativeModules,
   RefreshControl,
+  ToastAndroid,
 } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import {
@@ -466,10 +467,10 @@ export default function App() {
       const data = await response.json();
 
       if (data.balance !== undefined) {
-        // Format balance with full precision for display
+        // Format balance with up to 6 decimals for display
         const balanceStr = data.balance.toLocaleString("en-US", {
           minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
+          maximumFractionDigits: 6,
         });
         const usdStr = data.tokens[0]?.valueUSD
           ? `$${data.tokens[0].valueUSD.toLocaleString("en-US", {
@@ -867,8 +868,7 @@ export default function App() {
       // Using Legacy format avoids "Invalid tag" errors with older Ledger firmware.
       // ============================================================================
 
-      // Create transaction
-      const fromPubkey = new PublicKey(selectedWallet.publicKey);
+      // Create transaction (fromPubkey already declared above for balance check)
       const toPubkey = new PublicKey(trimmedAddress);
       const lamports = Math.floor(amountNum * LAMPORTS_PER_SOL);
 
@@ -962,6 +962,31 @@ export default function App() {
 
       console.log("Transaction confirmed!");
       setSendConfirming(false);
+
+      // Show elegant toast with clickable transaction link
+      const explorerUrl = `${currentNetwork.explorerUrl}/tx/${signature}`;
+      const toastMessage = `✅ Transaction confirmed!\nTap to view: ${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}`;
+
+      if (Platform.OS === "android") {
+        ToastAndroid.showWithGravityAndOffset(
+          toastMessage,
+          ToastAndroid.LONG,
+          ToastAndroid.BOTTOM,
+          0,
+          100
+        );
+
+        // Open explorer URL after short delay to allow user to see toast
+        setTimeout(() => {
+          Alert.alert("Transaction Successful", `View on explorer?`, [
+            {
+              text: "View Transaction",
+              onPress: () => Linking.openURL(explorerUrl),
+            },
+            { text: "Close", style: "cancel" },
+          ]);
+        }, 1000);
+      }
 
       // Refresh balance after a short delay
       setTimeout(() => {
