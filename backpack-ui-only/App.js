@@ -135,6 +135,20 @@ const NETWORKS = [
     name: "X1 Mainnet",
     providerId: "X1-mainnet",
     rpcUrl: "https://rpc.mainnet.x1.xyz",
+    explorerUrl: "https://explorer.x1.xyz",
+    logo: require("./assets/x1.png"),
+    nativeToken: {
+      name: "X1 Native Token",
+      symbol: "XNT",
+      logo: require("./assets/x1.png"),
+    },
+  },
+  {
+    id: "X1_TESTNET",
+    name: "X1 Testnet",
+    providerId: "X1-testnet",
+    rpcUrl: "https://rpc.testnet.x1.xyz",
+    explorerUrl: "https://explorer.testnet.x1.xyz",
     logo: require("./assets/x1.png"),
     nativeToken: {
       name: "X1 Native Token",
@@ -148,6 +162,7 @@ const NETWORKS = [
     providerId: "SOLANA-mainnet",
     rpcUrl:
       "https://capable-autumn-thunder.solana-mainnet.quiknode.pro/3d4ed46b454fa0ca3df983502fdf15fe87145d9e/",
+    explorerUrl: "https://explorer.solana.com",
     logo: require("./assets/solana.png"),
     nativeToken: {
       name: "Solana",
@@ -296,7 +311,7 @@ export default function App() {
             await AsyncStorage.getItem("@selectedWalletId");
           if (storedSelectedWalletId) {
             const selectedWalletFromStorage = walletsWithKeypairs.find(
-              (w) => w.id === storedSelectedWalletId
+              (w) => String(w.id) === storedSelectedWalletId
             );
             if (selectedWalletFromStorage) {
               setSelectedWallet(selectedWalletFromStorage);
@@ -805,13 +820,6 @@ export default function App() {
       return;
     }
 
-    // Check balance
-    const balanceNum = parseFloat(balance.replace(/,/g, ""));
-    if (amountNum > balanceNum) {
-      Alert.alert("Error", "Insufficient balance");
-      return;
-    }
-
     // Close send drawer and show confirmation screen
     sendSheetRef.current?.close();
     setShowSendConfirm(true);
@@ -827,6 +835,25 @@ export default function App() {
 
       // Create connection to current network
       const connection = new Connection(currentNetwork.rpcUrl, "confirmed");
+
+      // Fetch actual balance from blockchain
+      const fromPubkey = new PublicKey(selectedWallet.publicKey);
+      console.log("Fetching current balance from blockchain...");
+      const actualBalance = await connection.getBalance(fromPubkey);
+      const actualBalanceSOL = actualBalance / 1000000000; // Convert lamports to SOL
+      console.log("Actual balance:", actualBalanceSOL, "SOL");
+
+      // Check if we have enough balance (including network fee estimate)
+      const estimatedFee = 0.000005; // Typical Solana fee
+      const totalNeeded = amountNum + estimatedFee;
+
+      if (totalNeeded > actualBalanceSOL) {
+        setSendConfirming(false);
+        setSendError(
+          `Insufficient balance. You have ${actualBalanceSOL.toFixed(6)} SOL but need ${totalNeeded.toFixed(6)} SOL (including ~${estimatedFee} SOL fee)`
+        );
+        return;
+      }
 
       // ============================================================================
       // LEDGER COMPATIBILITY NOTE:
