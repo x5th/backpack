@@ -31,9 +31,8 @@ appId: com.anonymous.backpackuionly
 - takeScreenshot: "02-wallet-list-opened"
 
 # Step 2: Verify the bottom sheet opened and at least one wallet is visible
-- assertVisible:
-    id: "wallet-list-sheet"
 - assertVisible: "Wallets"
+- assertVisible: "Wallet 1"
 
 # Step 3: Tap the 3-dot menu button on the first wallet
 - tapOn:
@@ -44,8 +43,6 @@ appId: com.anonymous.backpackuionly
 - takeScreenshot: "03-menu-opened"
 
 # Step 4: Verify the edit wallet sheet opened with all menu options
-- assertVisible:
-    id: "edit-wallet-sheet"
 - assertVisible: "Edit Wallet"
 - assertVisible: "Change Account Name"
 - assertVisible: "Show Private Key"
@@ -82,10 +79,8 @@ appId: com.anonymous.backpackuionly
 
 - takeScreenshot: "06-back-to-wallet-list"
 
-# Step 10: Verify we can see either wallet list or wallet content
-# (After closing, we should be back at wallet list)
-- assertVisible:
-    id: "wallet-list-sheet"
+# Step 10: Verify we're back at wallet list
+- assertVisible: "Wallets"
 
 # Step 11: Open the 3-dot menu again to access seed phrase
 - tapOn:
@@ -96,9 +91,8 @@ appId: com.anonymous.backpackuionly
 - takeScreenshot: "07-menu-reopened"
 
 # Step 12: Verify the edit wallet sheet opened
-- assertVisible:
-    id: "edit-wallet-sheet"
 - assertVisible: "Edit Wallet"
+- assertVisible: "Show Seed Phrase"
 
 # Step 13: Tap "Show Seed Phrase" button
 - tapOn:
@@ -130,8 +124,7 @@ appId: com.anonymous.backpackuionly
 - takeScreenshot: "10-back-to-wallet-list-again"
 
 # Step 18: Verify we're back at the wallet list
-- assertVisible:
-    id: "wallet-list-sheet"
+- assertVisible: "Wallets"
 
 # Step 19: Close the wallet list
 - tapOn:
