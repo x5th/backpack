@@ -62,7 +62,7 @@ import { WebView } from "react-native-webview";
 const { LedgerUsb } = NativeModules;
 
 // Network configurations
-const API_SERVER = "http://192.168.1.61:4000";
+const API_SERVER = "http://162.250.126.66:4000";
 const DEMO_WALLET_ADDRESS = "29dSqUTTH5okWAr3oLkQWrV968FQxgVqPCSqMqRLj8K2";
 
 // Mock wallets data
@@ -233,9 +233,11 @@ export default function App() {
   const [sendError, setSendError] = useState("");
 
   // Browser/WebView states
-  const [browserUrl, setBrowserUrl] = useState("http://192.168.1.61:4000/test");
+  const [browserUrl, setBrowserUrl] = useState(
+    "http://162.250.126.66:4000/test"
+  );
   const [browserInputUrl, setBrowserInputUrl] = useState(
-    "http://192.168.1.61:4000/test"
+    "http://162.250.126.66:4000/test"
   );
   const [showTestBrowser, setShowTestBrowser] = useState(false);
   const webViewRef = useRef(null);
