@@ -121,23 +121,8 @@ kill_metro() {
 install_dependencies() {
     print_warning "This project is part of a monorepo."
     print_warning "Dependencies should be installed from the root directory: /home/jack/backpack"
-
-    if [ "$CI_MODE" = false ]; then
-        print_step "Install/update dependencies from root? (y/n)"
-        read -r response
-        if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-            print_step "Installing dependencies from monorepo root..."
-            cd "/home/jack/backpack"
-            yarn install
-            print_success "Dependencies installed"
-            cd "$PROJECT_DIR"
-        else
-            print_success "Skipping dependency installation"
-        fi
-    else
-        print_step "Skipping dependency installation in CI mode"
-        print_success "Dependencies assumed to be installed"
-    fi
+    print_step "Skipping dependency installation"
+    print_success "Dependencies assumed to be installed"
 }
 
 # Clean previous builds
