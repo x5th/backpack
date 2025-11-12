@@ -1,0 +1,25 @@
+appId: com.anonymous.backpackuionly
+---
+# Test: Wallet Creation Flow
+# Verifies creating a new wallet and seeing it in the wallet list
+
+- launchApp
+- assertVisible: "Wallets"
+
+# Open wallet creation
+- tapOn: "Create New Wallet"
+- assertVisible: "New Wallet"
+
+# Enter wallet name
+- tapOn:
+    id: "wallet-name-input"
+- inputText: "Test Wallet ${random}"
+- tapOn: "Create"
+
+# Verify wallet appears in list
+- assertVisible: "Test Wallet"
+- assertVisible: "0.000000 XNT"  # New wallet should have 0 balance
+
+# Verify we can select the new wallet
+- tapOn: "Test Wallet"
+- assertVisible: "Selected"
