@@ -1529,7 +1529,7 @@ export default function App() {
 
   const copySeedPhrase = () => {
     Clipboard.setString(newMnemonic);
-    Alert.alert("Copied", "Seed phrase copied to clipboard");
+    ToastAndroid.show("Copied to clipboard", ToastAndroid.SHORT);
   };
 
   const handleImportWallet = async () => {
@@ -1601,6 +1601,10 @@ export default function App() {
   };
 
   const handleConfirmCreateWallet = async () => {
+    // Copy seed phrase to clipboard before proceeding
+    Clipboard.setString(newMnemonic);
+    ToastAndroid.show("Seed phrase copied to clipboard", ToastAndroid.SHORT);
+
     try {
       const seed = await bip39.mnemonicToSeed(newMnemonic);
       const keypair = Keypair.fromSeed(seed.slice(0, 32));
@@ -2983,9 +2987,10 @@ export default function App() {
         backgroundStyle={{ backgroundColor: "#000000" }}
         handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
       >
-        <BottomSheetView
+        <BottomSheetScrollView
           testID="wallet-list-sheet"
-          style={styles.bottomSheetContent}
+          contentContainerStyle={styles.bottomSheetScrollContent}
+          showsVerticalScrollIndicator={false}
         >
           {/* Header */}
           <View style={styles.bottomSheetHeader}>
@@ -3009,7 +3014,7 @@ export default function App() {
           </View>
 
           {/* Wallets List */}
-          <ScrollView style={styles.bottomSheetList}>
+          <View style={styles.bottomSheetList}>
             {wallets.map((wallet, index) => (
               <TouchableOpacity
                 key={wallet.id}
@@ -3072,8 +3077,8 @@ export default function App() {
                 </View>
               </TouchableOpacity>
             ))}
-          </ScrollView>
-        </BottomSheetView>
+          </View>
+        </BottomSheetScrollView>
       </BottomSheet>
 
       {/* Account Selector Side Drawer */}
@@ -3668,13 +3673,13 @@ export default function App() {
                 </TouchableOpacity>
               </View>
               <Text style={styles.seedPhraseTitle}>Your Seed Phrase</Text>
-              <Text style={styles.seedPhraseSubtitle}>
-                Tap anywhere to copy to clipboard
-              </Text>
-              <TouchableOpacity
-                style={styles.seedPhraseContainer}
-                onPress={copySeedPhrase}
-              >
+              <View style={styles.seedPhraseContainer}>
+                <TouchableOpacity
+                  style={styles.seedPhraseCopyBtnInside}
+                  onPress={copySeedPhrase}
+                >
+                  <Text style={styles.seedPhraseCopyIconInside}>⧉</Text>
+                </TouchableOpacity>
                 <View style={styles.seedPhraseGrid}>
                   {newMnemonic.split(" ").map((word, index) => (
                     <View key={index} style={styles.seedPhraseWord}>
@@ -3684,7 +3689,7 @@ export default function App() {
                     </View>
                   ))}
                 </View>
-              </TouchableOpacity>
+              </View>
               <Text style={styles.seedPhraseWarning}>
                 Save this seed phrase securely. You'll need it to recover your
                 wallet.
@@ -5049,6 +5054,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     backgroundColor: "#000000",
   },
+  bottomSheetScrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: "#000000",
+  },
   bottomSheetHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -5528,12 +5538,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#FFFFFF",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  seedPhraseSubtitle: {
-    fontSize: 14,
-    color: "#888888",
     marginBottom: 16,
     textAlign: "center",
   },
@@ -5543,6 +5547,19 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     minHeight: 100,
+    position: "relative",
+  },
+  seedPhraseCopyBtnInside: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    padding: 8,
+    backgroundColor: "transparent",
+    zIndex: 10,
+  },
+  seedPhraseCopyIconInside: {
+    fontSize: 24,
+    color: "#888888",
   },
   seedPhraseGrid: {
     flexDirection: "row",
