@@ -100,9 +100,9 @@ const MOCK_WALLETS = [
   },
 ];
 
-const MASTER_SEED_STORAGE_KEY = "@masterSeedPhrase";
-const DERIVATION_INDEX_STORAGE_KEY = "@derivationIndex";
-const WALLET_MNEMONIC_KEY_PREFIX = "@walletMnemonic:";
+const MASTER_SEED_STORAGE_KEY = "masterSeedPhrase";
+const DERIVATION_INDEX_STORAGE_KEY = "derivationIndex";
+const WALLET_MNEMONIC_KEY_PREFIX = "walletMnemonic_";
 
 const getWalletMnemonicKey = (walletId) =>
   `${WALLET_MNEMONIC_KEY_PREFIX}${walletId}`;
@@ -127,19 +127,39 @@ const saveSecureItem = async (key, value) => {
   }
 };
 
+// Legacy key mapping for migration from AsyncStorage
+const LEGACY_KEY_MAP = {
+  masterSeedPhrase: "@masterSeedPhrase",
+  derivationIndex: "@derivationIndex",
+};
+
 const getSecureItem = async (key) => {
   try {
     const secureAvailable = await SecureStore.isAvailableAsync();
     if (secureAvailable) {
       const stored = await SecureStore.getItemAsync(key);
       if (stored) {
+        // Clean up old AsyncStorage keys (both new and legacy)
         await AsyncStorage.removeItem(key);
+        const legacyKey = LEGACY_KEY_MAP[key];
+        if (legacyKey) await AsyncStorage.removeItem(legacyKey);
         return stored;
       }
-      const legacy = await AsyncStorage.getItem(key);
+
+      // Try to migrate from AsyncStorage (check legacy key first)
+      const legacyKey = LEGACY_KEY_MAP[key];
+      const legacy = legacyKey
+        ? await AsyncStorage.getItem(legacyKey)
+        : await AsyncStorage.getItem(key);
+
       if (legacy) {
+        console.log(
+          `Migrating ${key} from AsyncStorage${legacyKey ? ` (legacy key: ${legacyKey})` : ""} to SecureStore`
+        );
         await SecureStore.setItemAsync(key, legacy);
+        if (legacyKey) await AsyncStorage.removeItem(legacyKey);
         await AsyncStorage.removeItem(key);
+        console.log(`Successfully migrated ${key} to SecureStore`);
         return legacy;
       }
       return null;
@@ -292,7 +312,8 @@ export default function App() {
   const [newSeedPhraseInput, setNewSeedPhraseInput] = useState("");
   const [changeSeedPhraseMode, setChangeSeedPhraseMode] = useState("enter"); // "enter" or "generate"
   const [generatedNewSeed, setGeneratedNewSeed] = useState("");
-  const [showSecurityDrawer, setShowSecurityDrawer] = useState(false);
+  const [settingsNavigationStack, setSettingsNavigationStack] = useState([]); // Stack for settings navigation: ['manageSecurity', 'exportSeed', etc.]
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [currentBottomTab, setCurrentBottomTab] = useState("portfolio"); // "portfolio", "swap", "browser"
   const [walletSeedPhraseForDisplay, setWalletSeedPhraseForDisplay] =
     useState(null);
@@ -347,16 +368,20 @@ export default function App() {
   const browserSheetRef = useRef(null);
   const privateKeySheetRef = useRef(null);
   const seedPhraseSheetRef = useRef(null);
-  const exportSeedPhraseSheetRef = useRef(null);
-  const changeSeedPhraseSheetRef = useRef(null);
 
   const snapPoints = useMemo(() => ["50%", "90%"], []);
 
-  // Debug logging function
-  const addDebugLog = useCallback((message) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setDebugLogs((prev) => [...prev, `[${timestamp}] ${message}`].slice(-100)); // Keep last 100 logs
-  }, []);
+  // Debug logging function - only logs when debug drawer is active
+  const addDebugLog = useCallback(
+    (message) => {
+      if (!showDebugDrawer) return; // Only log when debug drawer is open
+      const timestamp = new Date().toLocaleTimeString();
+      setDebugLogs((prev) =>
+        [...prev, `[${timestamp}] ${message}`].slice(-100)
+      ); // Keep last 100 logs
+    },
+    [showDebugDrawer]
+  );
 
   // Wallet storage functions
   const saveWalletsToStorage = async (walletsToSave) => {
@@ -801,6 +826,51 @@ export default function App() {
     setWallets(wallets.map((w) => ({ ...w, selected: w.id === wallet.id })));
     setSelectedWallet(wallet);
     bottomSheetRef.current?.close();
+  };
+
+  // Settings navigation helpers
+  const navigateToSettingsScreen = (screen) => {
+    setSettingsNavigationStack([...settingsNavigationStack, screen]);
+  };
+
+  const navigateBackInSettings = () => {
+    if (settingsNavigationStack.length > 0) {
+      const newStack = [...settingsNavigationStack];
+      const currentScreen = newStack.pop();
+      setSettingsNavigationStack(newStack);
+
+      // Reset state when leaving certain screens
+      if (currentScreen === "changeSeed") {
+        setNewSeedPhraseInput("");
+        setGeneratedNewSeed("");
+        setChangeSeedPhraseMode("enter");
+      }
+    } else {
+      // If stack is empty, close the settings modal
+      setShowSettingsModal(false);
+    }
+  };
+
+  const closeAllSettings = () => {
+    setSettingsNavigationStack([]);
+    setShowSettingsModal(false);
+    // Reset state
+    setNewSeedPhraseInput("");
+    setGeneratedNewSeed("");
+    setChangeSeedPhraseMode("enter");
+  };
+
+  const handleChangeSeedPhrase = (seedPhrase) => {
+    // If seedPhrase is provided (from generated), use it; otherwise it will be read from input
+    if (seedPhrase) {
+      // Generate mode - set the generated seed and call confirm
+      setGeneratedNewSeed(seedPhrase);
+      // Wait a moment for state to update, then call confirm
+      setTimeout(() => handleConfirmChangeSeedPhrase(), 100);
+    } else {
+      // Enter mode - call confirm directly
+      handleConfirmChangeSeedPhrase();
+    }
   };
 
   const handleDeleteWallet = (wallet) => {
@@ -1711,6 +1781,11 @@ export default function App() {
     ToastAndroid.show("Copied to clipboard", ToastAndroid.SHORT);
   };
 
+  const copyGeneratedSeedPhrase = () => {
+    Clipboard.setString(generatedNewSeed);
+    ToastAndroid.show("Copied to clipboard", ToastAndroid.SHORT);
+  };
+
   const handleImportWallet = async () => {
     try {
       let keypair;
@@ -1945,7 +2020,7 @@ export default function App() {
               setNewSeedPhraseInput("");
               setGeneratedNewSeed("");
               setChangeSeedPhraseMode("enter");
-              setShowChangeSeedPhraseModal(false);
+              closeAllSettings();
             } catch (error) {
               Alert.alert(
                 "Error",
@@ -2941,1844 +3016,1431 @@ export default function App() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView style={styles.container}>
-        <StatusBar hidden={true} />
-        {/* Top Header with Safe Area */}
-        <View style={styles.safeTopArea} />
-        <View style={styles.topBar}>
-          {/* Wallet selector on the left */}
-          <View style={styles.walletSelectorLeft}>
-            <TouchableOpacity
-              testID="wallet-selector-button"
-              style={styles.walletDropdownButton}
-              onPress={showWalletSelector}
-            >
-              <Image
-                source={require("./assets/x1.png")}
-                style={styles.x1LogoSmall}
-              />
-              <Text style={styles.walletDropdownText}>
-                {selectedWallet?.name || "No wallet"}
-              </Text>
-              <Text style={styles.walletDropdownArrow}>▼</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Network switch in the middle */}
-          <View style={styles.quickSwitchContainer}>
-            <TouchableOpacity
-              testID="x1-network-button"
-              style={[
-                styles.quickSwitchButton,
-                currentNetwork.id === "X1" && styles.quickSwitchButtonActive,
-              ]}
-              onPress={() => switchNetwork(NETWORKS.find((n) => n.id === "X1"))}
-            >
-              <Image
-                source={require("./assets/x1.png")}
-                style={styles.quickSwitchIcon}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              testID="solana-network-button"
-              style={[
-                styles.quickSwitchButton,
-                currentNetwork.id === "SOLANA" &&
-                  styles.quickSwitchButtonActive,
-              ]}
-              onPress={() =>
-                switchNetwork(NETWORKS.find((n) => n.id === "SOLANA"))
-              }
-            >
-              <Image
-                source={require("./assets/solana.png")}
-                style={styles.quickSwitchIcon}
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* Activity and Settings icons on the right */}
-          <View style={styles.topBarRightIcons}>
-            {/* Offline indicator */}
-            {!isOnline && (
+    <>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaView style={styles.container}>
+          <StatusBar hidden={true} />
+          {/* Top Header with Safe Area */}
+          <View style={styles.safeTopArea} />
+          <View style={styles.topBar}>
+            {/* Wallet selector on the left */}
+            <View style={styles.walletSelectorLeft}>
               <TouchableOpacity
-                style={styles.offlineIndicator}
-                onPress={() => {
-                  if (Platform.OS === "android") {
-                    Linking.sendIntent("android.settings.WIFI_SETTINGS");
-                  } else {
-                    Linking.openURL("app-settings:");
-                  }
-                }}
+                testID="wallet-selector-button"
+                style={styles.walletDropdownButton}
+                onPress={showWalletSelector}
               >
-                <Text style={styles.offlineIcon}>📡</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={styles.activityIcon}
-              onPress={() => activitySheetRef.current?.expand()}
-            >
-              <Image
-                source={require("./assets/clock.png")}
-                style={styles.activityIconImage}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.settingsIcon}
-              onPress={() => settingsSheetRef.current?.expand()}
-            >
-              <Image
-                source={require("./assets/settings.png")}
-                style={styles.settingsIconImage}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Main Scrollable Content */}
-        <ScrollView
-          style={styles.mainContent}
-          contentContainerStyle={styles.mainContentContainer}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#4A90E2"
-              colors={["#4A90E2"]}
-            />
-          }
-        >
-          {/* Balance Section with all content */}
-          <View style={styles.balanceSection}>
-            {/* Balance display */}
-            <View style={styles.balanceContent}>
-              <Text style={styles.balanceUSD}>{balanceUSD}</Text>
-              <Text style={styles.balanceChange}>
-                {tokenPrice !== null
-                  ? `${getNativeTokenInfo().symbol} $${tokenPrice.toLocaleString(
-                      "en-US",
-                      {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      }
-                    )}`
-                  : "$0.00"}
-              </Text>
-            </View>
-
-            {/* Action Buttons */}
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={styles.actionCircle}
-                onPress={handleReceive}
-              >
-                <View style={styles.actionCircleBg}>
-                  <Text style={styles.actionCircleIcon}>▼</Text>
-                </View>
-                <Text style={styles.actionCircleText}>Receive</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionCircle}
-                onPress={handleSend}
-              >
-                <View style={styles.actionCircleBg}>
-                  <Text style={styles.actionCircleIcon}>▲</Text>
-                </View>
-                <Text style={styles.actionCircleText}>Send</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionCircle}
-                onPress={handleSwap}
-              >
-                <View style={styles.actionCircleBg}>
-                  <Image
-                    source={require("./assets/swap.png")}
-                    style={styles.swapIcon}
-                  />
-                </View>
-                <Text style={styles.actionCircleText}>Swap</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionCircle}
-                onPress={handleStake}
-              >
-                <View style={styles.actionCircleBg}>
-                  <Text style={styles.actionCircleIcon}>◈</Text>
-                </View>
-                <Text style={styles.actionCircleText}>Stake</Text>
+                <Image
+                  source={require("./assets/x1.png")}
+                  style={styles.x1LogoSmall}
+                />
+                <Text style={styles.walletDropdownText}>
+                  {selectedWallet?.name || "No wallet"}
+                </Text>
+                <Text style={styles.walletDropdownArrow}>▼</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Token List */}
-            <View style={styles.tokenSection}>
-              {tokens.map((token) => {
-                const nativeToken = getNativeTokenInfo();
-                return (
-                  <View key={token.id} style={styles.tokenRow}>
-                    <View style={styles.tokenLeft}>
-                      <View style={styles.tokenIconLarge}>
-                        <Image
-                          testID={`native-token-icon-${currentNetwork.id.toLowerCase()}`}
-                          source={nativeToken.logo}
-                          style={styles.x1LogoLarge}
-                        />
-                      </View>
-                      <View style={styles.tokenInfo}>
-                        <Text style={styles.tokenNameLarge}>
-                          {nativeToken.name}
-                        </Text>
-                        <Text style={styles.tokenBalanceSmall}>
-                          {token.balance} {nativeToken.symbol}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.tokenRight}>
-                      <Text style={styles.tokenUsdLarge}>
-                        ${token.usdValue}
-                      </Text>
-                      <Text style={styles.tokenChange}>+$0.00</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        </ScrollView>
-
-        {/* Bottom Tab Bar */}
-        <View style={styles.bottomTabBar}>
-          <TouchableOpacity
-            style={styles.bottomTabItem}
-            onPress={() => {
-              setCurrentBottomTab("portfolio");
-              setShowTestBrowser(false);
-            }}
-          >
-            <Image
-              source={require("./assets/pie-chart-icon.png")}
-              style={[
-                styles.bottomTabIconImage,
-                currentBottomTab === "portfolio" &&
-                  styles.bottomTabIconImageActive,
-              ]}
-              resizeMode="contain"
-            />
-            <Text
-              style={[
-                styles.bottomTabText,
-                currentBottomTab === "portfolio" && styles.bottomTabTextActive,
-              ]}
-            >
-              Portfolio
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.bottomTabItem}
-            onPress={() => {
-              setCurrentBottomTab("swap");
-              handleSwap();
-            }}
-          >
-            <Image
-              source={require("./assets/swap.png")}
-              style={[
-                styles.bottomTabIconImage,
-                currentBottomTab === "swap" && styles.bottomTabIconImageActive,
-              ]}
-              resizeMode="contain"
-            />
-            <Text
-              style={[
-                styles.bottomTabText,
-                currentBottomTab === "swap" && styles.bottomTabTextActive,
-              ]}
-            >
-              Swap
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.bottomTabItem}
-            onPress={() => {
-              setCurrentBottomTab("browser");
-              setShowTestBrowser(true);
-            }}
-          >
-            <Image
-              source={require("./assets/browser.png")}
-              style={styles.bottomTabIconImage}
-              resizeMode="contain"
-            />
-            <Text
-              style={[
-                styles.bottomTabText,
-                currentBottomTab === "browser" && styles.bottomTabTextActive,
-              ]}
-            >
-              Browser
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-
-      {/* Network Selector Side Drawer */}
-      <BottomSheet
-        ref={networkSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
-      >
-        <BottomSheetView style={styles.bottomSheetContent}>
-          {/* Header */}
-          <View style={styles.bottomSheetHeader}>
-            <TouchableOpacity onPress={() => networkSheetRef.current?.close()}>
-              <Text style={styles.bottomSheetClose}>✕</Text>
-            </TouchableOpacity>
-            <Text style={styles.bottomSheetTitle}>Select Network</Text>
-            <View style={{ width: 24 }} />
-          </View>
-
-          {/* Network List */}
-          <ScrollView style={styles.networkList}>
-            {NETWORKS.map((network) => (
+            {/* Network switch in the middle */}
+            <View style={styles.quickSwitchContainer}>
               <TouchableOpacity
-                key={network.id}
+                testID="x1-network-button"
                 style={[
-                  styles.networkItem,
-                  currentNetwork.id === network.id &&
-                    styles.networkItemSelected,
+                  styles.quickSwitchButton,
+                  currentNetwork.id === "X1" && styles.quickSwitchButtonActive,
                 ]}
-                onPress={() => switchNetwork(network)}
+                onPress={() =>
+                  switchNetwork(NETWORKS.find((n) => n.id === "X1"))
+                }
               >
-                <Image source={network.logo} style={styles.networkItemIcon} />
-                <Text style={styles.networkItemText}>{network.name}</Text>
-                {currentNetwork.id === network.id && (
-                  <Text style={styles.networkItemCheck}>✓</Text>
-                )}
+                <Image
+                  source={require("./assets/x1.png")}
+                  style={styles.quickSwitchIcon}
+                />
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </BottomSheetView>
-      </BottomSheet>
+              <TouchableOpacity
+                testID="solana-network-button"
+                style={[
+                  styles.quickSwitchButton,
+                  currentNetwork.id === "SOLANA" &&
+                    styles.quickSwitchButtonActive,
+                ]}
+                onPress={() =>
+                  switchNetwork(NETWORKS.find((n) => n.id === "SOLANA"))
+                }
+              >
+                <Image
+                  source={require("./assets/solana.png")}
+                  style={styles.quickSwitchIcon}
+                />
+              </TouchableOpacity>
+            </View>
 
-      {/* Bluetooth Devices Drawer */}
-      {showBluetoothDrawer && (
-        <Modal
-          visible={showBluetoothDrawer}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowBluetoothDrawer(false)}
-        >
-          <Pressable
-            style={styles.networkDrawerOverlay}
-            onPress={() => setShowBluetoothDrawer(false)}
-          >
-            <Pressable
-              style={styles.networkDrawerContent}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <View style={styles.networkDrawerContentArea}>
-                {/* Header */}
-                <View style={styles.networkDrawerHeader}>
-                  <Text style={styles.networkDrawerTitle}>
-                    Bluetooth Devices
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setShowBluetoothDrawer(false)}
-                  >
-                    <Text style={styles.networkDrawerClose}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Device List */}
-                <ScrollView style={styles.networkList}>
-                  {pairedDevices.length === 0 ? (
-                    <View style={styles.emptyBluetoothList}>
-                      <Text style={styles.emptyBluetoothText}>
-                        No paired Bluetooth devices found
-                      </Text>
-                      <Text style={styles.emptyBluetoothSubtext}>
-                        Connect to a Ledger device to see it here
-                      </Text>
-                    </View>
-                  ) : (
-                    pairedDevices.map((device) => (
-                      <View key={device.id} style={styles.bluetoothDeviceItem}>
-                        <View style={styles.bluetoothDeviceInfo}>
-                          <Text style={styles.bluetoothDeviceName}>
-                            {device.name}
-                          </Text>
-                          <Text style={styles.bluetoothDeviceAddress}>
-                            {device.address}
-                          </Text>
-                          {device.isConnected && (
-                            <Text style={styles.bluetoothDeviceConnected}>
-                              Connected
-                            </Text>
-                          )}
-                        </View>
-                        <View style={styles.bluetoothDeviceButtons}>
-                          <TouchableOpacity
-                            style={styles.bluetoothDeviceDeleteButton}
-                            onPress={() => forgetBluetoothDevice(device.id)}
-                          >
-                            <Text style={styles.bluetoothDeviceDeleteText}>
-                              Forget
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))
-                  )}
-                </ScrollView>
-
-                {/* Scan Button */}
+            {/* Activity and Settings icons on the right */}
+            <View style={styles.topBarRightIcons}>
+              {/* Offline indicator */}
+              {!isOnline && (
                 <TouchableOpacity
-                  style={styles.bluetoothRefreshButton}
-                  onPress={async () => {
-                    setShowBluetoothDrawer(false);
-                    ledgerSheetRef.current?.expand();
-                    await scanForLedger();
+                  style={styles.offlineIndicator}
+                  onPress={() => {
+                    if (Platform.OS === "android") {
+                      Linking.sendIntent("android.settings.WIFI_SETTINGS");
+                    } else {
+                      Linking.openURL("app-settings:");
+                    }
                   }}
                 >
-                  <Text style={styles.bluetoothRefreshButtonText}>Scan</Text>
+                  <Text style={styles.offlineIcon}>📡</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.activityIcon}
+                onPress={() => activitySheetRef.current?.expand()}
+              >
+                <Image
+                  source={require("./assets/clock.png")}
+                  style={styles.activityIconImage}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.settingsIcon}
+                onPress={() => {
+                  console.log("Settings button pressed!");
+                  setShowSettingsModal(true);
+                }}
+              >
+                <Image
+                  source={require("./assets/settings.png")}
+                  style={styles.settingsIconImage}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Main Scrollable Content */}
+          <ScrollView
+            style={styles.mainContent}
+            contentContainerStyle={styles.mainContentContainer}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#4A90E2"
+                colors={["#4A90E2"]}
+              />
+            }
+          >
+            {/* Balance Section with all content */}
+            <View style={styles.balanceSection}>
+              {/* Balance display */}
+              <View style={styles.balanceContent}>
+                <Text style={styles.balanceUSD}>{balanceUSD}</Text>
+                <Text style={styles.balanceChange}>
+                  {tokenPrice !== null
+                    ? `${getNativeTokenInfo().symbol} $${tokenPrice.toLocaleString(
+                        "en-US",
+                        {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        }
+                      )}`
+                    : "$0.00"}
+                </Text>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={styles.actionCircle}
+                  onPress={handleReceive}
+                >
+                  <View style={styles.actionCircleBg}>
+                    <Text style={styles.actionCircleIcon}>▼</Text>
+                  </View>
+                  <Text style={styles.actionCircleText}>Receive</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionCircle}
+                  onPress={handleSend}
+                >
+                  <View style={styles.actionCircleBg}>
+                    <Text style={styles.actionCircleIcon}>▲</Text>
+                  </View>
+                  <Text style={styles.actionCircleText}>Send</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionCircle}
+                  onPress={handleSwap}
+                >
+                  <View style={styles.actionCircleBg}>
+                    <Image
+                      source={require("./assets/swap.png")}
+                      style={styles.swapIcon}
+                    />
+                  </View>
+                  <Text style={styles.actionCircleText}>Swap</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionCircle}
+                  onPress={handleStake}
+                >
+                  <View style={styles.actionCircleBg}>
+                    <Text style={styles.actionCircleIcon}>◈</Text>
+                  </View>
+                  <Text style={styles.actionCircleText}>Stake</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Token List */}
+              <View style={styles.tokenSection}>
+                {tokens.map((token) => {
+                  const nativeToken = getNativeTokenInfo();
+                  return (
+                    <View key={token.id} style={styles.tokenRow}>
+                      <View style={styles.tokenLeft}>
+                        <View style={styles.tokenIconLarge}>
+                          <Image
+                            testID={`native-token-icon-${currentNetwork.id.toLowerCase()}`}
+                            source={nativeToken.logo}
+                            style={styles.x1LogoLarge}
+                          />
+                        </View>
+                        <View style={styles.tokenInfo}>
+                          <Text style={styles.tokenNameLarge}>
+                            {nativeToken.name}
+                          </Text>
+                          <Text style={styles.tokenBalanceSmall}>
+                            {token.balance} {nativeToken.symbol}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.tokenRight}>
+                        <Text style={styles.tokenUsdLarge}>
+                          ${token.usdValue}
+                        </Text>
+                        <Text style={styles.tokenChange}>+$0.00</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </ScrollView>
+
+          {/* Bottom Tab Bar */}
+          <View style={styles.bottomTabBar}>
+            <TouchableOpacity
+              style={styles.bottomTabItem}
+              onPress={() => {
+                setCurrentBottomTab("portfolio");
+                setShowTestBrowser(false);
+              }}
+            >
+              <Image
+                source={require("./assets/pie-chart-icon.png")}
+                style={[
+                  styles.bottomTabIconImage,
+                  currentBottomTab === "portfolio" &&
+                    styles.bottomTabIconImageActive,
+                ]}
+                resizeMode="contain"
+              />
+              <Text
+                style={[
+                  styles.bottomTabText,
+                  currentBottomTab === "portfolio" &&
+                    styles.bottomTabTextActive,
+                ]}
+              >
+                Portfolio
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.bottomTabItem}
+              onPress={() => {
+                setCurrentBottomTab("swap");
+                handleSwap();
+              }}
+            >
+              <Image
+                source={require("./assets/swap.png")}
+                style={[
+                  styles.bottomTabIconImage,
+                  currentBottomTab === "swap" &&
+                    styles.bottomTabIconImageActive,
+                ]}
+                resizeMode="contain"
+              />
+              <Text
+                style={[
+                  styles.bottomTabText,
+                  currentBottomTab === "swap" && styles.bottomTabTextActive,
+                ]}
+              >
+                Swap
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.bottomTabItem}
+              onPress={() => {
+                setCurrentBottomTab("browser");
+                setShowTestBrowser(true);
+              }}
+            >
+              <Image
+                source={require("./assets/browser.png")}
+                style={styles.bottomTabIconImage}
+                resizeMode="contain"
+              />
+              <Text
+                style={[
+                  styles.bottomTabText,
+                  currentBottomTab === "browser" && styles.bottomTabTextActive,
+                ]}
+              >
+                Browser
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+
+        {/* Network Selector Side Drawer */}
+        <BottomSheet
+          ref={networkSheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          enablePanDownToClose={true}
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ backgroundColor: "#000000" }}
+          handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
+        >
+          <BottomSheetView style={styles.bottomSheetContent}>
+            {/* Header */}
+            <View style={styles.bottomSheetHeader}>
+              <TouchableOpacity
+                onPress={() => networkSheetRef.current?.close()}
+              >
+                <Text style={styles.bottomSheetClose}>✕</Text>
+              </TouchableOpacity>
+              <Text style={styles.bottomSheetTitle}>Select Network</Text>
+              <View style={{ width: 24 }} />
+            </View>
+
+            {/* Network List */}
+            <ScrollView style={styles.networkList}>
+              {NETWORKS.map((network) => (
+                <TouchableOpacity
+                  key={network.id}
+                  style={[
+                    styles.networkItem,
+                    currentNetwork.id === network.id &&
+                      styles.networkItemSelected,
+                  ]}
+                  onPress={() => switchNetwork(network)}
+                >
+                  <Image source={network.logo} style={styles.networkItemIcon} />
+                  <Text style={styles.networkItemText}>{network.name}</Text>
+                  {currentNetwork.id === network.id && (
+                    <Text style={styles.networkItemCheck}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </BottomSheetView>
+        </BottomSheet>
+
+        {/* Bluetooth Devices Drawer */}
+        {showBluetoothDrawer && (
+          <Modal
+            visible={showBluetoothDrawer}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setShowBluetoothDrawer(false)}
+          >
+            <Pressable
+              style={styles.networkDrawerOverlay}
+              onPress={() => setShowBluetoothDrawer(false)}
+            >
+              <Pressable
+                style={styles.networkDrawerContent}
+                onPress={(e) => e.stopPropagation()}
+              >
+                <View style={styles.networkDrawerContentArea}>
+                  {/* Header */}
+                  <View style={styles.networkDrawerHeader}>
+                    <Text style={styles.networkDrawerTitle}>
+                      Bluetooth Devices
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowBluetoothDrawer(false)}
+                    >
+                      <Text style={styles.networkDrawerClose}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Device List */}
+                  <ScrollView style={styles.networkList}>
+                    {pairedDevices.length === 0 ? (
+                      <View style={styles.emptyBluetoothList}>
+                        <Text style={styles.emptyBluetoothText}>
+                          No paired Bluetooth devices found
+                        </Text>
+                        <Text style={styles.emptyBluetoothSubtext}>
+                          Connect to a Ledger device to see it here
+                        </Text>
+                      </View>
+                    ) : (
+                      pairedDevices.map((device) => (
+                        <View
+                          key={device.id}
+                          style={styles.bluetoothDeviceItem}
+                        >
+                          <View style={styles.bluetoothDeviceInfo}>
+                            <Text style={styles.bluetoothDeviceName}>
+                              {device.name}
+                            </Text>
+                            <Text style={styles.bluetoothDeviceAddress}>
+                              {device.address}
+                            </Text>
+                            {device.isConnected && (
+                              <Text style={styles.bluetoothDeviceConnected}>
+                                Connected
+                              </Text>
+                            )}
+                          </View>
+                          <View style={styles.bluetoothDeviceButtons}>
+                            <TouchableOpacity
+                              style={styles.bluetoothDeviceDeleteButton}
+                              onPress={() => forgetBluetoothDevice(device.id)}
+                            >
+                              <Text style={styles.bluetoothDeviceDeleteText}>
+                                Forget
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </ScrollView>
+
+                  {/* Scan Button */}
+                  <TouchableOpacity
+                    style={styles.bluetoothRefreshButton}
+                    onPress={async () => {
+                      setShowBluetoothDrawer(false);
+                      ledgerSheetRef.current?.expand();
+                      await scanForLedger();
+                    }}
+                  >
+                    <Text style={styles.bluetoothRefreshButtonText}>Scan</Text>
+                  </TouchableOpacity>
+                </View>
+              </Pressable>
+            </Pressable>
+          </Modal>
+        )}
+
+        {/* Wallet Selector Bottom Sheet */}
+        <BottomSheet
+          ref={bottomSheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          onChange={handleSheetChanges}
+          enablePanDownToClose={true}
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ backgroundColor: "#000000" }}
+          handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
+        >
+          <BottomSheetScrollView
+            testID="wallet-list-sheet"
+            contentContainerStyle={styles.bottomSheetScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header */}
+            <View style={styles.bottomSheetHeader}>
+              <TouchableOpacity onPress={() => bottomSheetRef.current?.close()}>
+                <Text style={styles.bottomSheetClose}>✕</Text>
+              </TouchableOpacity>
+              <View style={styles.bottomSheetTitleContainer}>
+                <Text style={styles.bottomSheetTitle}>Wallets</Text>
+                <Text style={styles.bottomSheetNetworkBadge}>
+                  {currentNetwork.name}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={handleAddWallet}>
+                <Text style={styles.bottomSheetAdd}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Network Logo */}
+            <View style={styles.bottomSheetLogo}>
+              <Image source={currentNetwork.logo} style={styles.x1LogoMedium} />
+            </View>
+
+            {/* Wallets List */}
+            <View style={styles.bottomSheetList}>
+              {wallets.map((wallet, index) => (
+                <TouchableOpacity
+                  key={wallet.id}
+                  testID={`wallet-item-${wallet.id}`}
+                  style={[
+                    styles.bottomSheetWalletItem,
+                    wallet.selected && styles.bottomSheetWalletItemSelected,
+                  ]}
+                  onPress={() => selectWallet(wallet)}
+                >
+                  <View style={styles.bottomSheetWalletLeft}>
+                    <Image
+                      source={currentNetwork.logo}
+                      style={styles.x1LogoLarge}
+                    />
+                    <View style={styles.bottomSheetWalletInfo}>
+                      <Text style={styles.bottomSheetWalletName}>
+                        {wallet.name}
+                      </Text>
+                      <Text style={styles.bottomSheetWalletAddress}>
+                        {copiedWalletId === wallet.id
+                          ? "Copied"
+                          : wallet.address}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.bottomSheetWalletRight}>
+                    <TouchableOpacity
+                      testID={
+                        index === 0
+                          ? "first-wallet-copy-button"
+                          : `wallet-copy-button-${wallet.id}`
+                      }
+                      style={styles.bottomSheetCopyBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        Clipboard.setString(wallet.publicKey);
+                        setCopiedWalletId(wallet.id);
+                        setTimeout(() => {
+                          setCopiedWalletId(null);
+                        }, 3000);
+                      }}
+                    >
+                      <Text style={styles.bottomSheetCopyIcon}>⧉</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      testID={
+                        index === 0
+                          ? "first-wallet-menu-button"
+                          : `wallet-menu-button-${wallet.id}`
+                      }
+                      style={styles.bottomSheetEditBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setEditingWallet(wallet);
+                        setEditWalletName(wallet.name);
+                        editWalletSheetRef.current?.expand();
+                      }}
+                    >
+                      <Text style={styles.bottomSheetEditIcon}>⋮</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </BottomSheetScrollView>
+        </BottomSheet>
+
+        {/* Account Selector Side Drawer */}
+        <BottomSheet
+          ref={accountSheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          enablePanDownToClose={true}
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ backgroundColor: "#000000" }}
+          handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
+        >
+          <BottomSheetView style={styles.bottomSheetContent}>
+            {/* Header */}
+            <View style={styles.bottomSheetHeader}>
+              <TouchableOpacity
+                onPress={() => accountSheetRef.current?.close()}
+              >
+                <Text style={styles.bottomSheetClose}>✕</Text>
+              </TouchableOpacity>
+              <Text style={styles.bottomSheetTitle}>Select Account</Text>
+              <View style={{ width: 24 }} />
+            </View>
+
+            {/* Account List */}
+            <ScrollView style={styles.accountList}>
+              {accounts.map((account) => (
+                <TouchableOpacity
+                  key={account.id}
+                  style={[
+                    styles.accountItem,
+                    account.selected && styles.accountItemSelected,
+                  ]}
+                  onPress={() => selectAccount(account)}
+                >
+                  <View
+                    style={[
+                      styles.accountBadge,
+                      { backgroundColor: account.badgeColor },
+                    ]}
+                  >
+                    <Text style={styles.accountBadgeText}>{account.badge}</Text>
+                  </View>
+                  <Text style={styles.accountItemText}>{account.name}</Text>
+                  {account.selected && (
+                    <Text style={styles.accountItemCheck}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Add New Account Button */}
+            <TouchableOpacity style={styles.addAccountButton}>
+              <Text style={styles.addAccountButtonText}>+ New Account</Text>
+            </TouchableOpacity>
+          </BottomSheetView>
+        </BottomSheet>
+
+        {/* Debug Console - Full Page */}
+        <Modal
+          visible={showDebugDrawer}
+          transparent={false}
+          animationType="slide"
+          onRequestClose={() => setShowDebugDrawer(false)}
+        >
+          <SafeAreaView style={styles.debugFullPageContainer}>
+            {/* Header */}
+            <View style={styles.debugFullPageHeader}>
+              <Text style={styles.debugFullPageTitle}>Debug Console</Text>
+              <TouchableOpacity onPress={() => setShowDebugDrawer(false)}>
+                <Text style={styles.debugFullPageClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Debug Logs */}
+            <ScrollView
+              style={styles.debugLogList}
+              showsVerticalScrollIndicator={true}
+            >
+              {debugLogs.length === 0 ? (
+                <Text style={styles.debugNoLogs}>No logs yet...</Text>
+              ) : (
+                debugLogs.map((log, index) => (
+                  <Text key={index} style={styles.debugLogText}>
+                    {log}
+                  </Text>
+                ))
+              )}
+            </ScrollView>
+
+            {/* Clear Button */}
+            <View style={styles.debugFullPageFooter}>
+              <TouchableOpacity
+                style={styles.debugClearButton}
+                onPress={() => setDebugLogs([])}
+              >
+                <Text style={styles.debugClearButtonText}>Clear Logs</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </Modal>
+
+        {/* Receive Drawer */}
+        <BottomSheet
+          ref={receiveSheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          enablePanDownToClose={true}
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ backgroundColor: "#000000" }}
+          handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
+        >
+          <BottomSheetView style={styles.bottomSheetContent}>
+            {/* Header */}
+            <View style={styles.bottomSheetHeader}>
+              <Text style={styles.bottomSheetTitle}>
+                Receive {getNativeTokenInfo().symbol}
+              </Text>
+              <TouchableOpacity
+                onPress={() => receiveSheetRef.current?.close()}
+              >
+                <Text style={styles.bottomSheetClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* QR Code */}
+            <View style={styles.receiveQRContainer}>
+              <View style={styles.receiveQRWrapper}>
+                <QRCode
+                  value={selectedWallet?.publicKey || "No wallet"}
+                  size={200}
+                  backgroundColor="white"
+                  color="black"
+                />
+              </View>
+            </View>
+
+            {/* Address */}
+            <View style={styles.receiveAddressContainer}>
+              <Text style={styles.receiveAddressLabel}>Your Address</Text>
+              <Text style={styles.receiveAddressText} numberOfLines={1}>
+                {addressCopied
+                  ? "Copied"
+                  : selectedWallet?.publicKey || "No wallet selected"}
+              </Text>
+            </View>
+
+            {/* Copy Button */}
+            <TouchableOpacity
+              style={styles.receiveCopyButton}
+              onPress={() => {
+                copyToClipboard(selectedWallet.publicKey);
+                setAddressCopied(true);
+                setTimeout(() => {
+                  setAddressCopied(false);
+                }, 4000);
+              }}
+            >
+              <Text style={styles.receiveCopyButtonText}>Copy Address</Text>
+            </TouchableOpacity>
+          </BottomSheetView>
+        </BottomSheet>
+
+        {/* Send Drawer */}
+        <BottomSheet
+          ref={sendSheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          enablePanDownToClose={true}
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ backgroundColor: "#000000" }}
+          handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
+        >
+          <BottomSheetView style={styles.bottomSheetContent}>
+            {/* Header */}
+            <View style={styles.bottomSheetHeader}>
+              <TouchableOpacity onPress={() => sendSheetRef.current?.close()}>
+                <Text style={styles.bottomSheetClose}>✕</Text>
+              </TouchableOpacity>
+              <View style={styles.bottomSheetTitleContainer}>
+                <Text style={styles.bottomSheetTitle}>
+                  Send {getNativeTokenInfo().symbol}
+                </Text>
+              </View>
+              <View style={{ width: 24 }} />
+            </View>
+
+            {/* Balance Display */}
+            <View style={styles.sendBalanceContainer}>
+              <Text style={styles.sendBalanceLabel}>Available Balance</Text>
+              <TouchableOpacity onPress={() => setSendAmount(balance)}>
+                <Text style={styles.sendBalanceText}>
+                  {balance} {getNativeTokenInfo().symbol}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Amount Input */}
+            <View style={styles.sendInputContainer}>
+              <Text style={styles.sendInputLabel}>Amount</Text>
+              <TextInput
+                style={styles.sendInput}
+                placeholder="0.00"
+                placeholderTextColor="#666666"
+                value={sendAmount}
+                onChangeText={setSendAmount}
+                keyboardType="decimal-pad"
+              />
+            </View>
+
+            {/* Address Input */}
+            <View style={styles.sendInputContainer}>
+              <View style={styles.sendAddressHeader}>
+                <Text style={styles.sendInputLabel}>Recipient Address</Text>
+                <TouchableOpacity
+                  onPress={() => addressSheetRef.current?.expand()}
+                >
+                  <Text style={styles.sendSelectAddressText}>
+                    Select Address
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={styles.sendInput}
+                placeholder="Enter address..."
+                placeholderTextColor="#666666"
+                value={sendAddress}
+                onChangeText={setSendAddress}
+                autoCapitalize="none"
+              />
+            </View>
+
+            {/* Send Button */}
+            <TouchableOpacity
+              style={styles.sendSubmitButton}
+              onPress={handleSendSubmit}
+            >
+              <Text style={styles.sendSubmitButtonText}>Send</Text>
+            </TouchableOpacity>
+          </BottomSheetView>
+        </BottomSheet>
+
+        {/* Address Selector Modal */}
+        <BottomSheet
+          ref={addressSheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          enablePanDownToClose={true}
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ backgroundColor: "#000000" }}
+          handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
+        >
+          <BottomSheetView style={styles.bottomSheetContent}>
+            {/* Header */}
+            <View style={styles.bottomSheetHeader}>
+              <Text style={styles.bottomSheetTitle}>Select Address</Text>
+              <TouchableOpacity
+                onPress={() => addressSheetRef.current?.close()}
+              >
+                <Text style={styles.bottomSheetClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Address List */}
+            <ScrollView style={styles.addressList}>
+              {wallets.map((wallet, index) => (
+                <TouchableOpacity
+                  key={wallet.id}
+                  style={styles.addressItem}
+                  testID={
+                    index === 0
+                      ? "first-address-selector-wallet"
+                      : `address-selector-wallet-${index}`
+                  }
+                  onPress={() => {
+                    setSendAddress(wallet.publicKey);
+                    addressSheetRef.current?.close();
+                  }}
+                >
+                  <View style={styles.addressItemContent}>
+                    <Text style={styles.addressItemName}>{wallet.name}</Text>
+                    <Text style={styles.addressItemAddress} numberOfLines={1}>
+                      {wallet.address}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </BottomSheetView>
+        </BottomSheet>
+
+        {/* Activity Drawer */}
+        {/* Activity Bottom Sheet */}
+        <BottomSheet
+          ref={activitySheetRef}
+          index={-1}
+          snapPoints={["75%"]}
+          enablePanDownToClose={true}
+          backdropComponent={(props) => (
+            <BottomSheetBackdrop
+              {...props}
+              opacity={0.5}
+              enableTouchThrough={false}
+              appearsOnIndex={0}
+              disappearsOnIndex={-1}
+              style={[
+                { backgroundColor: "rgba(0, 0, 0, 1)" },
+                StyleSheet.absoluteFillObject,
+              ]}
+            />
+          )}
+          backgroundStyle={{ backgroundColor: "#000000" }}
+          handleIndicatorStyle={{ backgroundColor: "#4E5056" }}
+        >
+          {/* Activity List with BottomSheetScrollView */}
+          <BottomSheetScrollView
+            contentContainerStyle={styles.sheetScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header */}
+            <View style={styles.activitySheetHeader}>
+              <TouchableOpacity onPress={() => checkTransactions()}>
+                <Text style={styles.sheetHeaderButton}>↻</Text>
+              </TouchableOpacity>
+              <Text style={styles.activitySheetTitle}>Activity</Text>
+              <View style={{ width: 32 }} />
+            </View>
+
+            {/* Transactions List */}
+            {transactions.length === 0 ? (
+              <View style={styles.emptyStateContainer}>
+                <Text style={styles.emptyStateText}>No transactions yet</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Your transaction history will appear here
+                </Text>
+              </View>
+            ) : (
+              transactions.map((tx) => (
+                <TouchableOpacity
+                  key={tx.id}
+                  style={styles.activityCard}
+                  onPress={() => openExplorer(tx.signature)}
+                >
+                  {/* Token logo */}
+                  <Image
+                    source={
+                      tx.token === "XNT"
+                        ? require("./assets/x1.png")
+                        : require("./assets/solana.png")
+                    }
+                    style={styles.activityCardLogo}
+                  />
+
+                  <View style={styles.activityCardContent}>
+                    {/* Header with title and time */}
+                    <View style={styles.activityCardHeader}>
+                      <Text style={styles.activityCardTitle}>
+                        {tx.type === "received" ? "Received" : "Sent"}{" "}
+                        {tx.token}
+                      </Text>
+                      <Text style={styles.activityCardTime}>
+                        {tx.timestamp}
+                      </Text>
+                    </View>
+
+                    {/* Amount row */}
+                    <View style={styles.activityCardRow}>
+                      <Text style={styles.activityCardLabel}>Amount</Text>
+                      <Text
+                        style={[
+                          styles.activityCardValue,
+                          {
+                            color:
+                              tx.type === "received" ? "#00D084" : "#FF6B6B",
+                          },
+                        ]}
+                      >
+                        {tx.type === "received" ? "+" : "-"}
+                        {tx.amount} {tx.token}
+                      </Text>
+                    </View>
+
+                    {/* Fee row */}
+                    <View style={styles.activityCardRow}>
+                      <Text style={styles.activityCardLabel}>Fee</Text>
+                      <Text style={styles.activityCardValue}>
+                        {tx.fee || "0.000001650"} {tx.token}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </BottomSheetScrollView>
+        </BottomSheet>
+
+        {/* Add Wallet Modal - Choice */}
+        <Modal
+          visible={showAddWalletModal}
+          transparent={true}
+          animationType="slide"
+        >
+          <Pressable
+            style={styles.settingsDrawerOverlay}
+            onPress={() => setShowAddWalletModal(false)}
+          >
+            <Pressable
+              style={styles.settingsDrawerContent}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.settingsDrawerContentArea}>
+                <View style={styles.settingsDrawerHeader}>
+                  <View style={{ width: 32 }} />
+                  <Text style={styles.settingsDrawerTitle}>Add Wallet</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowAddWalletModal(false)}
+                  >
+                    <Text style={styles.settingsDrawerClose}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={styles.walletOptionButton}
+                  onPress={handleCreateNewWallet}
+                >
+                  <Text style={styles.walletOptionText}>Create New Wallet</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.walletOptionButton}
+                  onPress={handleShowImportWallet}
+                >
+                  <Text style={styles.walletOptionText}>Import Wallet</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.walletOptionButton}
+                  onPress={handleShowLedger}
+                >
+                  <Text style={styles.walletOptionText}>Connect Ledger</Text>
                 </TouchableOpacity>
               </View>
             </Pressable>
           </Pressable>
         </Modal>
-      )}
 
-      {/* Wallet Selector Bottom Sheet */}
-      <BottomSheet
-        ref={bottomSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        onChange={handleSheetChanges}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
-      >
-        <BottomSheetScrollView
-          testID="wallet-list-sheet"
-          contentContainerStyle={styles.bottomSheetScrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header */}
-          <View style={styles.bottomSheetHeader}>
-            <TouchableOpacity onPress={() => bottomSheetRef.current?.close()}>
-              <Text style={styles.bottomSheetClose}>✕</Text>
-            </TouchableOpacity>
-            <View style={styles.bottomSheetTitleContainer}>
-              <Text style={styles.bottomSheetTitle}>Wallets</Text>
-              <Text style={styles.bottomSheetNetworkBadge}>
-                {currentNetwork.name}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={handleAddWallet}>
-              <Text style={styles.bottomSheetAdd}>+</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Network Logo */}
-          <View style={styles.bottomSheetLogo}>
-            <Image source={currentNetwork.logo} style={styles.x1LogoMedium} />
-          </View>
-
-          {/* Wallets List */}
-          <View style={styles.bottomSheetList}>
-            {wallets.map((wallet, index) => (
-              <TouchableOpacity
-                key={wallet.id}
-                testID={`wallet-item-${wallet.id}`}
-                style={[
-                  styles.bottomSheetWalletItem,
-                  wallet.selected && styles.bottomSheetWalletItemSelected,
-                ]}
-                onPress={() => selectWallet(wallet)}
-              >
-                <View style={styles.bottomSheetWalletLeft}>
-                  <Image
-                    source={currentNetwork.logo}
-                    style={styles.x1LogoLarge}
-                  />
-                  <View style={styles.bottomSheetWalletInfo}>
-                    <Text style={styles.bottomSheetWalletName}>
-                      {wallet.name}
-                    </Text>
-                    <Text style={styles.bottomSheetWalletAddress}>
-                      {copiedWalletId === wallet.id ? "Copied" : wallet.address}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.bottomSheetWalletRight}>
-                  <TouchableOpacity
-                    testID={
-                      index === 0
-                        ? "first-wallet-copy-button"
-                        : `wallet-copy-button-${wallet.id}`
-                    }
-                    style={styles.bottomSheetCopyBtn}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      Clipboard.setString(wallet.publicKey);
-                      setCopiedWalletId(wallet.id);
-                      setTimeout(() => {
-                        setCopiedWalletId(null);
-                      }, 3000);
-                    }}
-                  >
-                    <Text style={styles.bottomSheetCopyIcon}>⧉</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    testID={
-                      index === 0
-                        ? "first-wallet-menu-button"
-                        : `wallet-menu-button-${wallet.id}`
-                    }
-                    style={styles.bottomSheetEditBtn}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      setEditingWallet(wallet);
-                      setEditWalletName(wallet.name);
-                      editWalletSheetRef.current?.expand();
-                    }}
-                  >
-                    <Text style={styles.bottomSheetEditIcon}>⋮</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </BottomSheetScrollView>
-      </BottomSheet>
-
-      {/* Account Selector Side Drawer */}
-      <BottomSheet
-        ref={accountSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
-      >
-        <BottomSheetView style={styles.bottomSheetContent}>
-          {/* Header */}
-          <View style={styles.bottomSheetHeader}>
-            <TouchableOpacity onPress={() => accountSheetRef.current?.close()}>
-              <Text style={styles.bottomSheetClose}>✕</Text>
-            </TouchableOpacity>
-            <Text style={styles.bottomSheetTitle}>Select Account</Text>
-            <View style={{ width: 24 }} />
-          </View>
-
-          {/* Account List */}
-          <ScrollView style={styles.accountList}>
-            {accounts.map((account) => (
-              <TouchableOpacity
-                key={account.id}
-                style={[
-                  styles.accountItem,
-                  account.selected && styles.accountItemSelected,
-                ]}
-                onPress={() => selectAccount(account)}
-              >
-                <View
-                  style={[
-                    styles.accountBadge,
-                    { backgroundColor: account.badgeColor },
-                  ]}
-                >
-                  <Text style={styles.accountBadgeText}>{account.badge}</Text>
-                </View>
-                <Text style={styles.accountItemText}>{account.name}</Text>
-                {account.selected && (
-                  <Text style={styles.accountItemCheck}>✓</Text>
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Add New Account Button */}
-          <TouchableOpacity style={styles.addAccountButton}>
-            <Text style={styles.addAccountButtonText}>+ New Account</Text>
-          </TouchableOpacity>
-        </BottomSheetView>
-      </BottomSheet>
-
-      {/* Settings Drawer */}
-      <BottomSheet
-        ref={settingsSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
-      >
-        <BottomSheetView style={styles.bottomSheetContent}>
-          {/* Header with Account Badge */}
-          <View style={styles.bottomSheetHeader}>
-            <View style={styles.settingsHeaderLeft}>
-              <View
-                style={[
-                  styles.settingsAccountBadge,
-                  { backgroundColor: selectedAccount.badgeColor },
-                ]}
-              >
-                <Text style={styles.settingsAccountBadgeText}>
-                  {selectedAccount.badge}
-                </Text>
-              </View>
-              <Text style={styles.settingsAccountName}>
-                {selectedAccount.name}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={() => settingsSheetRef.current?.close()}>
-              <Text style={styles.bottomSheetClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Menu Items */}
-          <ScrollView style={styles.settingsMenuList}>
-            <TouchableOpacity
-              style={styles.settingsMenuItem}
-              onPress={() => {
-                settingsSheetRef.current?.close();
-                networkSheetRef.current?.expand();
-              }}
-            >
-              <Text style={styles.settingsMenuItemText}>Network</Text>
-              <Text style={styles.settingsMenuItemArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.settingsMenuItem}
-              onPress={() => {
-                settingsSheetRef.current?.close();
-                setShowBluetoothDrawer(true);
-                fetchPairedBluetoothDevices();
-              }}
-            >
-              <Text style={styles.settingsMenuItemText}>Bluetooth Devices</Text>
-              <Text style={styles.settingsMenuItemArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.settingsMenuItem}
-              onPress={() => {
-                settingsSheetRef.current?.close();
-                Alert.alert(
-                  "Rename Wallet",
-                  "Rename wallet functionality would open here"
-                );
-              }}
-            >
-              <Text style={styles.settingsMenuItemText}>Rename Wallet</Text>
-              <Text style={styles.settingsMenuItemArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.settingsMenuItem}
-              onPress={() => {
-                settingsSheetRef.current?.close();
-                Alert.alert(
-                  "New Account",
-                  "Create new account functionality would open here"
-                );
-              }}
-            >
-              <Text style={styles.settingsMenuItemText}>New Account</Text>
-              <Text style={styles.settingsMenuItemArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.settingsMenuItem}
-              onPress={() => {
-                settingsSheetRef.current?.close();
-                Alert.alert("Preferences", "Preferences would open here");
-              }}
-            >
-              <Text style={styles.settingsMenuItemText}>Preferences</Text>
-              <Text style={styles.settingsMenuItemArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.settingsMenuItem}
-              onPress={() => {
-                settingsSheetRef.current?.close();
-                setShowSecurityDrawer(true);
-              }}
-            >
-              <Text style={styles.settingsMenuItemText}>Manage Security</Text>
-              <Text style={styles.settingsMenuItemArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.settingsMenuItem}
-              onPress={() => {
-                settingsSheetRef.current?.close();
-                if (Platform.OS === "android") {
-                  Linking.sendIntent("android.settings.WIFI_SETTINGS");
-                } else {
-                  Linking.openURL("app-settings:");
-                }
-              }}
-            >
-              <Text style={styles.settingsMenuItemText}>WiFi Settings</Text>
-              <Text style={styles.settingsMenuItemArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.settingsMenuItem}
-              onPress={() => {
-                settingsSheetRef.current?.close();
-                Alert.alert(
-                  "About X1 Wallet",
-                  "About X1 Wallet info would open here"
-                );
-              }}
-            >
-              <Text style={styles.settingsMenuItemText}>About X1 Wallet</Text>
-              <Text style={styles.settingsMenuItemArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.settingsMenuItem}
-              onPress={() => {
-                settingsSheetRef.current?.close();
-                setShowDebugDrawer(true);
-              }}
-            >
-              <Text style={styles.settingsMenuItemText}>Debug</Text>
-              <Text style={styles.settingsMenuItemArrow}>›</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </BottomSheetView>
-      </BottomSheet>
-
-      {/* Debug Console - Full Page */}
-      <Modal
-        visible={showDebugDrawer}
-        transparent={false}
-        animationType="slide"
-        onRequestClose={() => setShowDebugDrawer(false)}
-      >
-        <SafeAreaView style={styles.debugFullPageContainer}>
-          {/* Header */}
-          <View style={styles.debugFullPageHeader}>
-            <Text style={styles.debugFullPageTitle}>Debug Console</Text>
-            <TouchableOpacity onPress={() => setShowDebugDrawer(false)}>
-              <Text style={styles.debugFullPageClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Debug Logs */}
-          <ScrollView
-            style={styles.debugLogList}
-            showsVerticalScrollIndicator={true}
-          >
-            {debugLogs.length === 0 ? (
-              <Text style={styles.debugNoLogs}>No logs yet...</Text>
-            ) : (
-              debugLogs.map((log, index) => (
-                <Text key={index} style={styles.debugLogText}>
-                  {log}
-                </Text>
-              ))
-            )}
-          </ScrollView>
-
-          {/* Clear Button */}
-          <View style={styles.debugFullPageFooter}>
-            <TouchableOpacity
-              style={styles.debugClearButton}
-              onPress={() => setDebugLogs([])}
-            >
-              <Text style={styles.debugClearButtonText}>Clear Logs</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </Modal>
-
-      {/* Manage Security Drawer */}
-      <Modal
-        visible={showSecurityDrawer}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowSecurityDrawer(false)}
-      >
-        <Pressable
-          style={styles.settingsDrawerOverlay}
-          onPress={() => setShowSecurityDrawer(false)}
+        {/* Create Wallet Modal - Display Seed Phrase */}
+        <Modal
+          visible={showCreateWalletModal}
+          transparent={true}
+          animationType="slide"
         >
           <Pressable
-            style={styles.settingsDrawerContent}
-            onPress={(e) => e.stopPropagation()}
+            style={styles.settingsDrawerOverlay}
+            onPress={() => setShowCreateWalletModal(false)}
           >
-            <View style={styles.settingsDrawerContentArea}>
-              <View style={styles.settingsDrawerHeader}>
-                <View style={{ width: 32 }} />
-                <Text style={styles.settingsDrawerTitle}>Manage Security</Text>
-                <TouchableOpacity onPress={() => setShowSecurityDrawer(false)}>
-                  <Text style={styles.settingsDrawerClose}>✕</Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView style={{ flex: 1 }}>
-                <TouchableOpacity
-                  style={styles.settingsMenuItem}
-                  onPress={() => {
-                    setShowSecurityDrawer(false);
-                    exportSeedPhraseSheetRef.current?.expand();
-                    setSeedPhraseRevealed(false);
-                  }}
-                >
-                  <Text style={styles.settingsMenuItemText}>
-                    Export Seed Phrase
-                  </Text>
-                  <Text style={styles.settingsMenuItemArrow}>›</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.settingsMenuItem}
-                  onPress={() => {
-                    setShowSecurityDrawer(false);
-                    changeSeedPhraseSheetRef.current?.expand();
-                  }}
-                >
-                  <Text style={styles.settingsMenuItemText}>
-                    Change Seed Phrase
-                  </Text>
-                  <Text style={styles.settingsMenuItemArrow}>›</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Receive Drawer */}
-      <BottomSheet
-        ref={receiveSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
-      >
-        <BottomSheetView style={styles.bottomSheetContent}>
-          {/* Header */}
-          <View style={styles.bottomSheetHeader}>
-            <Text style={styles.bottomSheetTitle}>
-              Receive {getNativeTokenInfo().symbol}
-            </Text>
-            <TouchableOpacity onPress={() => receiveSheetRef.current?.close()}>
-              <Text style={styles.bottomSheetClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* QR Code */}
-          <View style={styles.receiveQRContainer}>
-            <View style={styles.receiveQRWrapper}>
-              <QRCode
-                value={selectedWallet?.publicKey || "No wallet"}
-                size={200}
-                backgroundColor="white"
-                color="black"
-              />
-            </View>
-          </View>
-
-          {/* Address */}
-          <View style={styles.receiveAddressContainer}>
-            <Text style={styles.receiveAddressLabel}>Your Address</Text>
-            <Text style={styles.receiveAddressText} numberOfLines={1}>
-              {addressCopied
-                ? "Copied"
-                : selectedWallet?.publicKey || "No wallet selected"}
-            </Text>
-          </View>
-
-          {/* Copy Button */}
-          <TouchableOpacity
-            style={styles.receiveCopyButton}
-            onPress={() => {
-              copyToClipboard(selectedWallet.publicKey);
-              setAddressCopied(true);
-              setTimeout(() => {
-                setAddressCopied(false);
-              }, 4000);
-            }}
-          >
-            <Text style={styles.receiveCopyButtonText}>Copy Address</Text>
-          </TouchableOpacity>
-        </BottomSheetView>
-      </BottomSheet>
-
-      {/* Send Drawer */}
-      <BottomSheet
-        ref={sendSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
-      >
-        <BottomSheetView style={styles.bottomSheetContent}>
-          {/* Header */}
-          <View style={styles.bottomSheetHeader}>
-            <TouchableOpacity onPress={() => sendSheetRef.current?.close()}>
-              <Text style={styles.bottomSheetClose}>✕</Text>
-            </TouchableOpacity>
-            <View style={styles.bottomSheetTitleContainer}>
-              <Text style={styles.bottomSheetTitle}>
-                Send {getNativeTokenInfo().symbol}
-              </Text>
-            </View>
-            <View style={{ width: 24 }} />
-          </View>
-
-          {/* Balance Display */}
-          <View style={styles.sendBalanceContainer}>
-            <Text style={styles.sendBalanceLabel}>Available Balance</Text>
-            <TouchableOpacity onPress={() => setSendAmount(balance)}>
-              <Text style={styles.sendBalanceText}>
-                {balance} {getNativeTokenInfo().symbol}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Amount Input */}
-          <View style={styles.sendInputContainer}>
-            <Text style={styles.sendInputLabel}>Amount</Text>
-            <TextInput
-              style={styles.sendInput}
-              placeholder="0.00"
-              placeholderTextColor="#666666"
-              value={sendAmount}
-              onChangeText={setSendAmount}
-              keyboardType="decimal-pad"
-            />
-          </View>
-
-          {/* Address Input */}
-          <View style={styles.sendInputContainer}>
-            <View style={styles.sendAddressHeader}>
-              <Text style={styles.sendInputLabel}>Recipient Address</Text>
-              <TouchableOpacity
-                onPress={() => addressSheetRef.current?.expand()}
-              >
-                <Text style={styles.sendSelectAddressText}>Select Address</Text>
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              style={styles.sendInput}
-              placeholder="Enter address..."
-              placeholderTextColor="#666666"
-              value={sendAddress}
-              onChangeText={setSendAddress}
-              autoCapitalize="none"
-            />
-          </View>
-
-          {/* Send Button */}
-          <TouchableOpacity
-            style={styles.sendSubmitButton}
-            onPress={handleSendSubmit}
-          >
-            <Text style={styles.sendSubmitButtonText}>Send</Text>
-          </TouchableOpacity>
-        </BottomSheetView>
-      </BottomSheet>
-
-      {/* Address Selector Modal */}
-      <BottomSheet
-        ref={addressSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
-      >
-        <BottomSheetView style={styles.bottomSheetContent}>
-          {/* Header */}
-          <View style={styles.bottomSheetHeader}>
-            <Text style={styles.bottomSheetTitle}>Select Address</Text>
-            <TouchableOpacity onPress={() => addressSheetRef.current?.close()}>
-              <Text style={styles.bottomSheetClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Address List */}
-          <ScrollView style={styles.addressList}>
-            {wallets.map((wallet, index) => (
-              <TouchableOpacity
-                key={wallet.id}
-                style={styles.addressItem}
-                testID={
-                  index === 0
-                    ? "first-address-selector-wallet"
-                    : `address-selector-wallet-${index}`
-                }
-                onPress={() => {
-                  setSendAddress(wallet.publicKey);
-                  addressSheetRef.current?.close();
-                }}
-              >
-                <View style={styles.addressItemContent}>
-                  <Text style={styles.addressItemName}>{wallet.name}</Text>
-                  <Text style={styles.addressItemAddress} numberOfLines={1}>
-                    {wallet.address}
-                  </Text>
+            <Pressable
+              style={styles.settingsDrawerContent}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.settingsDrawerContentArea}>
+                <View style={styles.settingsDrawerHeader}>
+                  <View style={{ width: 32 }} />
+                  <Text style={styles.settingsDrawerTitle}>Create Wallet</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowCreateWalletModal(false)}
+                  >
+                    <Text style={styles.settingsDrawerClose}>✕</Text>
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </BottomSheetView>
-      </BottomSheet>
-
-      {/* Activity Drawer */}
-      {/* Activity Bottom Sheet */}
-      <BottomSheet
-        ref={activitySheetRef}
-        index={-1}
-        snapPoints={["75%"]}
-        enablePanDownToClose={true}
-        backdropComponent={(props) => (
-          <BottomSheetBackdrop
-            {...props}
-            opacity={0.5}
-            enableTouchThrough={false}
-            appearsOnIndex={0}
-            disappearsOnIndex={-1}
-            style={[
-              { backgroundColor: "rgba(0, 0, 0, 1)" },
-              StyleSheet.absoluteFillObject,
-            ]}
-          />
-        )}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4E5056" }}
-      >
-        {/* Activity List with BottomSheetScrollView */}
-        <BottomSheetScrollView
-          contentContainerStyle={styles.sheetScrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header */}
-          <View style={styles.activitySheetHeader}>
-            <TouchableOpacity onPress={() => checkTransactions()}>
-              <Text style={styles.sheetHeaderButton}>↻</Text>
-            </TouchableOpacity>
-            <Text style={styles.activitySheetTitle}>Activity</Text>
-            <View style={{ width: 32 }} />
-          </View>
-
-          {/* Transactions List */}
-          {transactions.length === 0 ? (
-            <View style={styles.emptyStateContainer}>
-              <Text style={styles.emptyStateText}>No transactions yet</Text>
-              <Text style={styles.emptyStateSubtext}>
-                Your transaction history will appear here
-              </Text>
-            </View>
-          ) : (
-            transactions.map((tx) => (
-              <TouchableOpacity
-                key={tx.id}
-                style={styles.activityCard}
-                onPress={() => openExplorer(tx.signature)}
-              >
-                {/* Token logo */}
-                <Image
-                  source={
-                    tx.token === "XNT"
-                      ? require("./assets/x1.png")
-                      : require("./assets/solana.png")
-                  }
-                  style={styles.activityCardLogo}
-                />
-
-                <View style={styles.activityCardContent}>
-                  {/* Header with title and time */}
-                  <View style={styles.activityCardHeader}>
-                    <Text style={styles.activityCardTitle}>
-                      {tx.type === "received" ? "Received" : "Sent"} {tx.token}
-                    </Text>
-                    <Text style={styles.activityCardTime}>{tx.timestamp}</Text>
-                  </View>
-
-                  {/* Amount row */}
-                  <View style={styles.activityCardRow}>
-                    <Text style={styles.activityCardLabel}>Amount</Text>
+                <Text style={styles.seedPhraseTitle}>Your Seed Phrase</Text>
+                <View style={styles.seedPhraseContainer}>
+                  <TouchableOpacity
+                    style={styles.seedPhraseCopyBtnInside}
+                    onPress={copySeedPhrase}
+                  >
                     <Text
                       style={[
-                        styles.activityCardValue,
-                        {
-                          color: tx.type === "received" ? "#00D084" : "#FF6B6B",
-                        },
+                        styles.seedPhraseCopyIconInside,
+                        { fontSize: 20.4 },
                       ]}
                     >
-                      {tx.type === "received" ? "+" : "-"}
-                      {tx.amount} {tx.token}
+                      ⧉
                     </Text>
-                  </View>
-
-                  {/* Fee row */}
-                  <View style={styles.activityCardRow}>
-                    <Text style={styles.activityCardLabel}>Fee</Text>
-                    <Text style={styles.activityCardValue}>
-                      {tx.fee || "0.000001650"} {tx.token}
-                    </Text>
+                  </TouchableOpacity>
+                  <View style={styles.seedPhraseGrid}>
+                    {newMnemonic.split(" ").map((word, index) => (
+                      <View key={index} style={styles.seedPhraseWord}>
+                        <Text style={styles.seedPhraseText}>
+                          {index + 1}. {word}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
                 </View>
-              </TouchableOpacity>
-            ))
-          )}
-        </BottomSheetScrollView>
-      </BottomSheet>
-
-      {/* Add Wallet Modal - Choice */}
-      <Modal
-        visible={showAddWalletModal}
-        transparent={true}
-        animationType="slide"
-      >
-        <Pressable
-          style={styles.settingsDrawerOverlay}
-          onPress={() => setShowAddWalletModal(false)}
-        >
-          <Pressable
-            style={styles.settingsDrawerContent}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={styles.settingsDrawerContentArea}>
-              <View style={styles.settingsDrawerHeader}>
-                <View style={{ width: 32 }} />
-                <Text style={styles.settingsDrawerTitle}>Add Wallet</Text>
-                <TouchableOpacity onPress={() => setShowAddWalletModal(false)}>
-                  <Text style={styles.settingsDrawerClose}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity
-                style={styles.walletOptionButton}
-                onPress={handleCreateNewWallet}
-              >
-                <Text style={styles.walletOptionText}>Create New Wallet</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.walletOptionButton}
-                onPress={handleShowImportWallet}
-              >
-                <Text style={styles.walletOptionText}>Import Wallet</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.walletOptionButton}
-                onPress={handleShowLedger}
-              >
-                <Text style={styles.walletOptionText}>Connect Ledger</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Create Wallet Modal - Display Seed Phrase */}
-      <Modal
-        visible={showCreateWalletModal}
-        transparent={true}
-        animationType="slide"
-      >
-        <Pressable
-          style={styles.settingsDrawerOverlay}
-          onPress={() => setShowCreateWalletModal(false)}
-        >
-          <Pressable
-            style={styles.settingsDrawerContent}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={styles.settingsDrawerContentArea}>
-              <View style={styles.settingsDrawerHeader}>
-                <View style={{ width: 32 }} />
-                <Text style={styles.settingsDrawerTitle}>Create Wallet</Text>
-                <TouchableOpacity
-                  onPress={() => setShowCreateWalletModal(false)}
-                >
-                  <Text style={styles.settingsDrawerClose}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.seedPhraseTitle}>Your Seed Phrase</Text>
-              <View style={styles.seedPhraseContainer}>
-                <TouchableOpacity
-                  style={styles.seedPhraseCopyBtnInside}
-                  onPress={copySeedPhrase}
-                >
-                  <Text style={styles.seedPhraseCopyIconInside}>⧉</Text>
-                </TouchableOpacity>
-                <View style={styles.seedPhraseGrid}>
-                  {newMnemonic.split(" ").map((word, index) => (
-                    <View key={index} style={styles.seedPhraseWord}>
-                      <Text style={styles.seedPhraseText}>
-                        {index + 1}. {word}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-              <Text style={styles.seedPhraseWarning}>
-                Save this seed phrase securely. You'll need it to recover your
-                wallet.
-              </Text>
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={handleConfirmCreateWallet}
-              >
-                <Text style={styles.confirmButtonText}>
-                  I've Saved My Seed Phrase
+                <Text style={styles.seedPhraseWarning}>
+                  Save this seed phrase securely. You'll need it to recover your
+                  wallet.
                 </Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={handleConfirmCreateWallet}
+                >
+                  <Text style={styles.confirmButtonText}>
+                    I've Saved My Seed Phrase
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
 
-      {/* Export Seed Phrase Bottom Sheet */}
-      <BottomSheet
-        ref={exportSeedPhraseSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
-      >
-        <BottomSheetScrollView style={styles.bottomSheetContent}>
-          <View style={styles.bottomSheetHeader}>
-            <View style={{ width: 32 }} />
-            <Text style={styles.bottomSheetTitle}>Export Seed Phrase</Text>
-            <TouchableOpacity
-              onPress={() => exportSeedPhraseSheetRef.current?.close()}
-            >
-              <Text style={styles.bottomSheetClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          {masterSeedPhrase ? (
-            <>
-              <Text style={styles.seedPhraseTitle}>
-                Your Master Seed Phrase
-              </Text>
-              <View style={styles.seedPhraseContainer}>
-                <TouchableOpacity
-                  style={styles.seedPhraseCopyBtnInside}
-                  onPress={handleCopyMasterSeedPhrase}
-                >
-                  <Text style={styles.seedPhraseCopyIconInside}>⧉</Text>
-                </TouchableOpacity>
-                <View style={styles.seedPhraseGrid}>
-                  {masterSeedPhrase.split(" ").map((word, index) => (
-                    <View key={index} style={styles.seedPhraseWord}>
-                      <Text style={styles.seedPhraseText}>
-                        {index + 1}. {word}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-              <Text style={styles.seedPhraseWarning}>
-                Keep this seed phrase secure. All your HD wallets are derived
-                from this master seed.
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.seedPhraseWarning}>
-              No master seed phrase found. Create a new wallet to generate one.
-            </Text>
-          )}
-        </BottomSheetScrollView>
-      </BottomSheet>
-
-      {/* Change Seed Phrase Bottom Sheet */}
-      <BottomSheet
-        ref={changeSeedPhraseSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
-        onClose={() => {
-          setNewSeedPhraseInput("");
-          setGeneratedNewSeed("");
-          setChangeSeedPhraseMode("enter");
-        }}
-      >
-        <BottomSheetScrollView style={styles.bottomSheetContent}>
-          <View style={styles.bottomSheetHeader}>
-            <View style={{ width: 32 }} />
-            <Text style={styles.bottomSheetTitle}>Change Seed Phrase</Text>
-            <TouchableOpacity
-              onPress={() => {
-                changeSeedPhraseSheetRef.current?.close();
-              }}
-            >
-              <Text style={styles.bottomSheetClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Mode Selector */}
-          <View
-            style={{
-              flexDirection: "row",
-              marginBottom: 16,
-              gap: 24,
-              paddingHorizontal: 20,
-              justifyContent: "center",
-            }}
-          >
-            <TouchableOpacity onPress={() => setChangeSeedPhraseMode("enter")}>
-              <Text
-                style={{
-                  fontSize: 16,
-                  color:
-                    changeSeedPhraseMode === "enter" ? "#FFFFFF" : "#888888",
-                  fontWeight: changeSeedPhraseMode === "enter" ? "600" : "400",
-                }}
-              >
-                Enter Seed Phrase
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                setChangeSeedPhraseMode("generate");
-                handleGenerateNewSeedPhrase();
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 16,
-                  color:
-                    changeSeedPhraseMode === "generate" ? "#FFFFFF" : "#888888",
-                  fontWeight:
-                    changeSeedPhraseMode === "generate" ? "600" : "400",
-                }}
-              >
-                Generate New
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Enter Mode */}
-          {changeSeedPhraseMode === "enter" ? (
-            <>
-              <TextInput
-                style={[styles.seedPhraseInput, { height: 120 }]}
-                multiline
-                placeholder="Enter your 12 or 24 word seed phrase"
-                value={newSeedPhraseInput}
-                onChangeText={setNewSeedPhraseInput}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </>
-          ) : (
-            <>
-              {/* Generate Mode */}
-              <View style={styles.seedPhraseContainer}>
-                <TouchableOpacity
-                  style={styles.seedPhraseCopyBtnInside}
-                  onPress={handleGenerateNewSeedPhrase}
-                >
-                  <Text style={styles.seedPhraseCopyIconInside}>⟳</Text>
-                </TouchableOpacity>
-                <View style={styles.seedPhraseGrid}>
-                  {generatedNewSeed.split(" ").map((word, index) => (
-                    <View key={index} style={styles.seedPhraseWord}>
-                      <Text style={styles.seedPhraseText}>
-                        {index + 1}. {word}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </>
-          )}
-
-          <Text style={styles.seedPhraseWarning}>
-            Warning: Changing your master seed phrase will only affect newly
-            created wallets. Existing wallets will remain unchanged and will
-            continue to use their original seed phrases.
-          </Text>
-          <View style={{ alignItems: "center", marginTop: 16 }}>
-            <TouchableOpacity
-              style={{
-                backgroundColor: "#DC2626",
-                paddingVertical: 12,
-                paddingHorizontal: 24,
-                borderRadius: 8,
-                width: "60%",
-                alignItems: "center",
-              }}
-              onPress={handleConfirmChangeSeedPhrase}
-            >
-              <Text
-                style={{ color: "#FFFFFF", fontSize: 16, fontWeight: "600" }}
-              >
-                Change Seed Phrase
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </BottomSheetScrollView>
-      </BottomSheet>
-
-      {/* Import Wallet Modal */}
-      <Modal
-        visible={showImportWalletModal}
-        transparent={true}
-        animationType="slide"
-      >
-        <Pressable
-          style={styles.settingsDrawerOverlay}
-          onPress={() => setShowImportWalletModal(false)}
+        {/* Import Wallet Modal */}
+        <Modal
+          visible={showImportWalletModal}
+          transparent={true}
+          animationType="slide"
         >
           <Pressable
-            style={styles.settingsDrawerContent}
-            onPress={(e) => e.stopPropagation()}
+            style={styles.settingsDrawerOverlay}
+            onPress={() => setShowImportWalletModal(false)}
           >
-            <View style={styles.settingsDrawerContentArea}>
-              <View style={styles.settingsDrawerHeader}>
-                <View style={{ width: 32 }} />
-                <Text style={styles.settingsDrawerTitle}>Import Wallet</Text>
-                <TouchableOpacity
-                  onPress={() => setShowImportWalletModal(false)}
-                >
-                  <Text style={styles.settingsDrawerClose}>✕</Text>
-                </TouchableOpacity>
-              </View>
+            <Pressable
+              style={styles.settingsDrawerContent}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.settingsDrawerContentArea}>
+                <View style={styles.settingsDrawerHeader}>
+                  <View style={{ width: 32 }} />
+                  <Text style={styles.settingsDrawerTitle}>Import Wallet</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowImportWalletModal(false)}
+                  >
+                    <Text style={styles.settingsDrawerClose}>✕</Text>
+                  </TouchableOpacity>
+                </View>
 
-              <View style={styles.importTypeToggle}>
-                <TouchableOpacity
-                  style={[
-                    styles.importTypeButton,
-                    importType === "mnemonic" && styles.importTypeButtonActive,
-                  ]}
-                  onPress={() => setImportType("mnemonic")}
-                >
-                  <Text
+                <View style={styles.importTypeToggle}>
+                  <TouchableOpacity
                     style={[
-                      styles.importTypeButtonText,
+                      styles.importTypeButton,
                       importType === "mnemonic" &&
-                        styles.importTypeButtonTextActive,
+                        styles.importTypeButtonActive,
                     ]}
+                    onPress={() => setImportType("mnemonic")}
                   >
-                    Recovery Phrase
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.importTypeButton,
-                    importType === "privateKey" &&
-                      styles.importTypeButtonActive,
-                  ]}
-                  onPress={() => setImportType("privateKey")}
-                >
-                  <Text
+                    <Text
+                      style={[
+                        styles.importTypeButtonText,
+                        importType === "mnemonic" &&
+                          styles.importTypeButtonTextActive,
+                      ]}
+                    >
+                      Recovery Phrase
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     style={[
-                      styles.importTypeButtonText,
+                      styles.importTypeButton,
                       importType === "privateKey" &&
-                        styles.importTypeButtonTextActive,
+                        styles.importTypeButtonActive,
                     ]}
+                    onPress={() => setImportType("privateKey")}
                   >
-                    Private Key
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                    <Text
+                      style={[
+                        styles.importTypeButtonText,
+                        importType === "privateKey" &&
+                          styles.importTypeButtonTextActive,
+                      ]}
+                    >
+                      Private Key
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
-              {importType === "mnemonic" ? (
-                <>
+                {importType === "mnemonic" ? (
+                  <>
+                    <TextInput
+                      style={styles.importInput}
+                      placeholder="Enter your 12-word recovery phrase"
+                      placeholderTextColor="#666666"
+                      value={importMnemonic}
+                      onChangeText={setImportMnemonic}
+                      multiline
+                      numberOfLines={4}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <Text style={styles.importLabel}>
+                      Derivation Index (m/44'/501'/index'/0')
+                    </Text>
+                    <TextInput
+                      style={styles.importDerivationInput}
+                      placeholder="0"
+                      placeholderTextColor="#666666"
+                      keyboardType="number-pad"
+                      value={importDerivationIndex}
+                      onChangeText={(text) =>
+                        setImportDerivationIndex(text.replace(/[^0-9]/g, ""))
+                      }
+                    />
+                    <Text style={styles.importHelperText}>
+                      Use 0 to recover the first wallet, or increase the index
+                      to restore additional accounts derived from the same seed
+                      phrase.
+                    </Text>
+                  </>
+                ) : (
                   <TextInput
                     style={styles.importInput}
-                    placeholder="Enter your 12-word recovery phrase"
+                    placeholder="Enter your private key (bs58 or JSON array)"
                     placeholderTextColor="#666666"
-                    value={importMnemonic}
-                    onChangeText={setImportMnemonic}
+                    value={importPrivateKey}
+                    onChangeText={setImportPrivateKey}
                     multiline
                     numberOfLines={4}
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
-                  <Text style={styles.importLabel}>
-                    Derivation Index (m/44'/501'/index'/0')
-                  </Text>
-                  <TextInput
-                    style={styles.importDerivationInput}
-                    placeholder="0"
-                    placeholderTextColor="#666666"
-                    keyboardType="number-pad"
-                    value={importDerivationIndex}
-                    onChangeText={(text) =>
-                      setImportDerivationIndex(text.replace(/[^0-9]/g, ""))
-                    }
-                  />
-                  <Text style={styles.importHelperText}>
-                    Use 0 to recover the first wallet, or increase the index to
-                    restore additional accounts derived from the same seed
-                    phrase.
-                  </Text>
-                </>
-              ) : (
-                <TextInput
-                  style={styles.importInput}
-                  placeholder="Enter your private key (bs58 or JSON array)"
-                  placeholderTextColor="#666666"
-                  value={importPrivateKey}
-                  onChangeText={setImportPrivateKey}
-                  multiline
-                  numberOfLines={4}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              )}
+                )}
 
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={handleImportWallet}
-              >
-                <Text style={styles.confirmButtonText}>Import Wallet</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Edit Wallet Modal */}
-      <BottomSheet
-        ref={editWalletSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
-      >
-        <BottomSheetView
-          testID="edit-wallet-sheet"
-          style={styles.bottomSheetContent}
-        >
-          <View style={styles.bottomSheetHeader}>
-            <View style={{ width: 32 }} />
-            <Text style={styles.bottomSheetTitle}>Edit Wallet</Text>
-            <TouchableOpacity
-              onPress={() => {
-                editWalletSheetRef.current?.close();
-                setEditingWallet(null);
-              }}
-            >
-              <Text style={styles.bottomSheetClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Menu Items */}
-          <ScrollView style={styles.settingsMenuList}>
-            <TouchableOpacity
-              testID="change-account-name-button"
-              style={styles.settingsMenuItem}
-              onPress={() => {
-                editWalletSheetRef.current?.close();
-                setShowChangeNameModal(true);
-              }}
-            >
-              <Text style={styles.settingsMenuItemText}>
-                Change Account Name
-              </Text>
-              <Text style={styles.settingsMenuItemArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              testID="show-private-key-button"
-              style={styles.settingsMenuItem}
-              onPress={() => {
-                editWalletSheetRef.current?.close();
-                setTimeout(() => {
-                  privateKeySheetRef.current?.expand();
-                }, 100);
-              }}
-            >
-              <Text style={styles.settingsMenuItemText}>Show Private Key</Text>
-              <Text style={styles.settingsMenuItemArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              testID="show-seed-phrase-button"
-              style={styles.settingsMenuItem}
-              onPress={() => {
-                editWalletSheetRef.current?.close();
-                setWalletSeedPhraseForDisplay(null);
-                setTimeout(() => {
-                  openSeedPhraseSheet();
-                }, 100);
-              }}
-            >
-              <Text style={styles.settingsMenuItemText}>Show Seed Phrase</Text>
-              <Text style={styles.settingsMenuItemArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              testID="delete-account-button"
-              style={styles.settingsMenuItem}
-              onPress={() => {
-                Alert.alert(
-                  "Delete Account",
-                  `Are you sure you want to delete "${editingWallet?.name}"? This action cannot be undone.`,
-                  [
-                    {
-                      text: "Cancel",
-                      style: "cancel",
-                    },
-                    {
-                      text: "Delete",
-                      style: "destructive",
-                      onPress: async () => {
-                        if (editingWallet) {
-                          const updatedWallets = wallets.filter(
-                            (w) => w.id !== editingWallet.id
-                          );
-                          setWallets(updatedWallets);
-                          await saveWalletsToStorage(updatedWallets);
-                          editWalletSheetRef.current?.close();
-                          setEditingWallet(null);
-                        }
-                      },
-                    },
-                  ]
-                );
-              }}
-            >
-              <Text style={[styles.settingsMenuItemText, { color: "#FF4444" }]}>
-                Delete Account
-              </Text>
-              <Text style={styles.settingsMenuItemArrow}>›</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </BottomSheetView>
-      </BottomSheet>
-
-      {/* Change Name Modal */}
-      <Modal
-        visible={showChangeNameModal}
-        transparent={true}
-        animationType="slide"
-      >
-        <Pressable
-          style={styles.settingsDrawerOverlay}
-          onPress={() => {
-            console.log("OVERLAY PRESSED - Closing all modals");
-            setShowChangeNameModal(false);
-            editWalletSheetRef.current?.close();
-            setEditingWallet(null);
-          }}
-        >
-          <Pressable
-            style={styles.settingsDrawerContent}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={styles.settingsDrawerContentArea}>
-              <View style={styles.settingsDrawerHeader}>
                 <TouchableOpacity
-                  onPress={() => {
-                    console.log("BACK BUTTON PRESSED (<) - Closing all modals");
-                    setShowChangeNameModal(false);
-                    editWalletSheetRef.current?.close();
-                    setEditingWallet(null);
-                  }}
+                  style={styles.confirmButton}
+                  onPress={handleImportWallet}
                 >
-                  <Text style={styles.settingsDrawerClose}>‹</Text>
-                </TouchableOpacity>
-                <Text style={styles.settingsDrawerTitle}>Change Name</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    console.log("X BUTTON PRESSED - Closing all modals");
-                    setShowChangeNameModal(false);
-                    editWalletSheetRef.current?.close();
-                    setEditingWallet(null);
-                  }}
-                >
-                  <Text style={styles.settingsDrawerClose}>✕</Text>
+                  <Text style={styles.confirmButtonText}>Import Wallet</Text>
                 </TouchableOpacity>
               </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
 
-              <Text style={styles.inputLabel}>Account Name</Text>
-              <TextInput
-                testID="account-name-input"
-                style={styles.walletNameInput}
-                placeholder="Wallet Name"
-                placeholderTextColor="#666666"
-                value={editWalletName}
-                onChangeText={(text) => {
-                  setEditWalletName(text);
-                  if (editingWallet && text.trim()) {
-                    const updatedWallets = wallets.map((w) =>
-                      w.id === editingWallet.id
-                        ? { ...w, name: text.trim() }
-                        : w
-                    );
-                    setWallets(updatedWallets);
-                    saveWalletsToStorage(updatedWallets);
-                  }
+        {/* Edit Wallet Modal */}
+        <BottomSheet
+          ref={editWalletSheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          enablePanDownToClose={true}
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ backgroundColor: "#000000" }}
+          handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
+        >
+          <BottomSheetView
+            testID="edit-wallet-sheet"
+            style={styles.bottomSheetContent}
+          >
+            <View style={styles.bottomSheetHeader}>
+              <View style={{ width: 32 }} />
+              <Text style={styles.bottomSheetTitle}>Edit Wallet</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  editWalletSheetRef.current?.close();
+                  setEditingWallet(null);
                 }}
-                autoCorrect={false}
-              />
+              >
+                <Text style={styles.bottomSheetClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Menu Items */}
+            <ScrollView style={styles.settingsMenuList}>
+              <TouchableOpacity
+                testID="change-account-name-button"
+                style={styles.settingsMenuItem}
+                onPress={() => {
+                  editWalletSheetRef.current?.close();
+                  setShowChangeNameModal(true);
+                }}
+              >
+                <Text style={styles.settingsMenuItemText}>
+                  Change Account Name
+                </Text>
+                <Text style={styles.settingsMenuItemArrow}>›</Text>
+              </TouchableOpacity>
 
               <TouchableOpacity
-                style={{ paddingVertical: 16, paddingHorizontal: 20 }}
+                testID="show-private-key-button"
+                style={styles.settingsMenuItem}
                 onPress={() => {
-                  console.log("SAVE BUTTON PRESSED");
-                  console.log("editingWallet:", editingWallet);
-                  console.log("editWalletName:", editWalletName);
-                  if (editingWallet && editWalletName.trim()) {
-                    console.log("Saving wallet name:", editWalletName.trim());
-                    const updatedWallets = wallets.map((w) =>
-                      w.id === editingWallet.id
-                        ? { ...w, name: editWalletName.trim() }
-                        : w
-                    );
-                    setWallets(updatedWallets);
-                    saveWalletsToStorage(updatedWallets);
-                    console.log("Closing both modals");
-                    setShowChangeNameModal(false);
-                    editWalletSheetRef.current?.close();
-                    setEditingWallet(null);
-                  } else {
-                    console.log("Not saving - wallet or name is empty");
-                  }
+                  editWalletSheetRef.current?.close();
+                  setTimeout(() => {
+                    privateKeySheetRef.current?.expand();
+                  }, 100);
+                }}
+              >
+                <Text style={styles.settingsMenuItemText}>
+                  Show Private Key
+                </Text>
+                <Text style={styles.settingsMenuItemArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                testID="show-seed-phrase-button"
+                style={styles.settingsMenuItem}
+                onPress={() => {
+                  editWalletSheetRef.current?.close();
+                  setWalletSeedPhraseForDisplay(null);
+                  setTimeout(() => {
+                    openSeedPhraseSheet();
+                  }, 100);
+                }}
+              >
+                <Text style={styles.settingsMenuItemText}>
+                  Show Seed Phrase
+                </Text>
+                <Text style={styles.settingsMenuItemArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                testID="delete-account-button"
+                style={styles.settingsMenuItem}
+                onPress={() => {
+                  Alert.alert(
+                    "Delete Account",
+                    `Are you sure you want to delete "${editingWallet?.name}"? This action cannot be undone.`,
+                    [
+                      {
+                        text: "Cancel",
+                        style: "cancel",
+                      },
+                      {
+                        text: "Delete",
+                        style: "destructive",
+                        onPress: async () => {
+                          if (editingWallet) {
+                            const updatedWallets = wallets.filter(
+                              (w) => w.id !== editingWallet.id
+                            );
+                            setWallets(updatedWallets);
+                            await saveWalletsToStorage(updatedWallets);
+                            editWalletSheetRef.current?.close();
+                            setEditingWallet(null);
+                          }
+                        },
+                      },
+                    ]
+                  );
                 }}
               >
                 <Text
-                  style={[
-                    styles.settingsDrawerTitle,
-                    { fontSize: 18, fontWeight: "600" },
-                  ]}
+                  style={[styles.settingsMenuItemText, { color: "#FF4444" }]}
                 >
-                  Save
+                  Delete Account
                 </Text>
+                <Text style={styles.settingsMenuItemArrow}>›</Text>
               </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+            </ScrollView>
+          </BottomSheetView>
+        </BottomSheet>
 
-      {/* View Private Key Bottom Sheet */}
-      <BottomSheet
-        ref={privateKeySheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
-      >
-        <BottomSheetView style={styles.bottomSheetContent}>
-          <View style={styles.bottomSheetHeader}>
-            <View style={{ width: 32 }} />
-            <Text style={styles.bottomSheetTitle}>Private Key</Text>
-            <TouchableOpacity
-              onPress={() => {
-                privateKeySheetRef.current?.close();
-              }}
+        {/* Change Name Modal */}
+        <Modal
+          visible={showChangeNameModal}
+          transparent={true}
+          animationType="slide"
+        >
+          <Pressable
+            style={styles.settingsDrawerOverlay}
+            onPress={() => {
+              console.log("OVERLAY PRESSED - Closing all modals");
+              setShowChangeNameModal(false);
+              editWalletSheetRef.current?.close();
+              setEditingWallet(null);
+            }}
+          >
+            <Pressable
+              style={styles.settingsDrawerContent}
+              onPress={(e) => e.stopPropagation()}
             >
-              <Text style={styles.bottomSheetClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {editingWallet && (
-            <View style={styles.privateKeyContainer}>
-              <View style={styles.privateKeyHeader}>
-                <Text style={styles.privateKeyLabel}>Private Key:</Text>
-                {editingWallet.secretKey && (
+              <View style={styles.settingsDrawerContentArea}>
+                <View style={styles.settingsDrawerHeader}>
                   <TouchableOpacity
-                    style={styles.bottomSheetCopyBtn}
                     onPress={() => {
-                      Clipboard.setString(
-                        bs58.encode(new Uint8Array(editingWallet.secretKey))
+                      console.log(
+                        "BACK BUTTON PRESSED (<) - Closing all modals"
                       );
-                      ToastAndroid.show(
-                        "Private key copied!",
-                        ToastAndroid.SHORT
-                      );
+                      setShowChangeNameModal(false);
+                      editWalletSheetRef.current?.close();
+                      setEditingWallet(null);
                     }}
                   >
-                    <Text style={styles.bottomSheetCopyIcon}>⧉</Text>
+                    <Text style={styles.settingsDrawerClose}>‹</Text>
                   </TouchableOpacity>
-                )}
+                  <Text style={styles.settingsDrawerTitle}>Change Name</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      console.log("X BUTTON PRESSED - Closing all modals");
+                      setShowChangeNameModal(false);
+                      editWalletSheetRef.current?.close();
+                      setEditingWallet(null);
+                    }}
+                  >
+                    <Text style={styles.settingsDrawerClose}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.inputLabel}>Account Name</Text>
+                <TextInput
+                  testID="account-name-input"
+                  style={styles.walletNameInput}
+                  placeholder="Wallet Name"
+                  placeholderTextColor="#666666"
+                  value={editWalletName}
+                  onChangeText={(text) => {
+                    setEditWalletName(text);
+                    if (editingWallet && text.trim()) {
+                      const updatedWallets = wallets.map((w) =>
+                        w.id === editingWallet.id
+                          ? { ...w, name: text.trim() }
+                          : w
+                      );
+                      setWallets(updatedWallets);
+                      saveWalletsToStorage(updatedWallets);
+                    }
+                  }}
+                  autoCorrect={false}
+                />
+
+                <TouchableOpacity
+                  style={{ paddingVertical: 16, paddingHorizontal: 20 }}
+                  onPress={() => {
+                    console.log("SAVE BUTTON PRESSED");
+                    console.log("editingWallet:", editingWallet);
+                    console.log("editWalletName:", editWalletName);
+                    if (editingWallet && editWalletName.trim()) {
+                      console.log("Saving wallet name:", editWalletName.trim());
+                      const updatedWallets = wallets.map((w) =>
+                        w.id === editingWallet.id
+                          ? { ...w, name: editWalletName.trim() }
+                          : w
+                      );
+                      setWallets(updatedWallets);
+                      saveWalletsToStorage(updatedWallets);
+                      console.log("Closing both modals");
+                      setShowChangeNameModal(false);
+                      editWalletSheetRef.current?.close();
+                      setEditingWallet(null);
+                    } else {
+                      console.log("Not saving - wallet or name is empty");
+                    }
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.settingsDrawerTitle,
+                      { fontSize: 18, fontWeight: "600" },
+                    ]}
+                  >
+                    Save
+                  </Text>
+                </TouchableOpacity>
               </View>
-              {editingWallet.secretKey ? (
-                <Text style={styles.privateKeyText} selectable={true}>
-                  {bs58.encode(new Uint8Array(editingWallet.secretKey))}
-                </Text>
-              ) : (
-                <Text style={styles.privateKeyText}>
-                  Not available. This is a hardware wallet (Ledger).
-                </Text>
-              )}
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* View Private Key Bottom Sheet */}
+        <BottomSheet
+          ref={privateKeySheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          enablePanDownToClose={true}
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ backgroundColor: "#000000" }}
+          handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
+        >
+          <BottomSheetView style={styles.bottomSheetContent}>
+            <View style={styles.bottomSheetHeader}>
+              <View style={{ width: 32 }} />
+              <Text style={styles.bottomSheetTitle}>Private Key</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  privateKeySheetRef.current?.close();
+                }}
+              >
+                <Text style={styles.bottomSheetClose}>✕</Text>
+              </TouchableOpacity>
             </View>
-          )}
-        </BottomSheetView>
-      </BottomSheet>
 
-      {/* View Seed Phrase Bottom Sheet */}
-      <BottomSheet
-        ref={seedPhraseSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
-      >
-        <BottomSheetView style={styles.bottomSheetContent}>
-          <View style={styles.bottomSheetHeader}>
-            <View style={{ width: 32 }} />
-            <Text style={styles.bottomSheetTitle}>Seed Phrase</Text>
-            <TouchableOpacity
-              onPress={() => {
-                seedPhraseSheetRef.current?.close();
-                setWalletSeedPhraseForDisplay(null);
-                setWalletSeedPhraseLoading(false);
-              }}
-            >
-              <Text style={styles.bottomSheetClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {editingWallet && (
-            <View style={styles.privateKeyContainer}>
-              <View style={styles.privateKeyHeader}>
-                <Text style={styles.privateKeyLabel}>
-                  Seed Phrase (Recovery Phrase):
-                </Text>
-                {!editingWallet.derivationPath &&
-                  walletSeedPhraseForDisplay &&
-                  !walletSeedPhraseLoading && (
+            {editingWallet && (
+              <View style={styles.privateKeyContainer}>
+                <View style={styles.privateKeyHeader}>
+                  <Text style={styles.privateKeyLabel}>Private Key:</Text>
+                  {editingWallet.secretKey && (
                     <TouchableOpacity
                       style={styles.bottomSheetCopyBtn}
                       onPress={() => {
-                        Clipboard.setString(walletSeedPhraseForDisplay);
+                        Clipboard.setString(
+                          bs58.encode(new Uint8Array(editingWallet.secretKey))
+                        );
                         ToastAndroid.show(
-                          "Seed phrase copied!",
+                          "Private key copied!",
                           ToastAndroid.SHORT
                         );
                       }}
@@ -4786,180 +4448,251 @@ export default function App() {
                       <Text style={styles.bottomSheetCopyIcon}>⧉</Text>
                     </TouchableOpacity>
                   )}
+                </View>
+                {editingWallet.secretKey ? (
+                  <Text style={styles.privateKeyText} selectable={true}>
+                    {bs58.encode(new Uint8Array(editingWallet.secretKey))}
+                  </Text>
+                ) : (
+                  <Text style={styles.privateKeyText}>
+                    Not available. This is a hardware wallet (Ledger).
+                  </Text>
+                )}
               </View>
+            )}
+          </BottomSheetView>
+        </BottomSheet>
 
-              {editingWallet.derivationPath ? (
-                <Text style={styles.privateKeyText}>
-                  This wallet is derived from your master seed phrase. Go to
-                  Manage Security -> Export Seed Phrase to view or back it up.
-                </Text>
-              ) : walletSeedPhraseLoading ? (
-                <Text style={styles.privateKeyText}>
-                  Loading seed phrase...
-                </Text>
-              ) : walletSeedPhraseForDisplay ? (
-                <Text style={styles.seedPhraseText} selectable={true}>
-                  {walletSeedPhraseForDisplay}
-                </Text>
-              ) : (
-                <Text style={styles.privateKeyText}>
-                  No stored recovery phrase was found for this wallet.
-                </Text>
-              )}
+        {/* View Seed Phrase Bottom Sheet */}
+        <BottomSheet
+          ref={seedPhraseSheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          enablePanDownToClose={true}
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ backgroundColor: "#000000" }}
+          handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
+        >
+          <BottomSheetView style={styles.bottomSheetContent}>
+            <View style={styles.bottomSheetHeader}>
+              <View style={{ width: 32 }} />
+              <Text style={styles.bottomSheetTitle}>Seed Phrase</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  seedPhraseSheetRef.current?.close();
+                  setWalletSeedPhraseForDisplay(null);
+                  setWalletSeedPhraseLoading(false);
+                }}
+              >
+                <Text style={styles.bottomSheetClose}>✕</Text>
+              </TouchableOpacity>
             </View>
-          )}
-        </BottomSheetView>
-      </BottomSheet>
 
-      {/* Ledger Connection Bottom Sheet */}
-      <BottomSheet
-        ref={ledgerSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: "#000000" }}
-        handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
-      >
-        <BottomSheetView style={styles.bottomSheetContent}>
-          <View style={styles.bottomSheetHeader}>
-            <View style={{ width: 32 }} />
-            <Text style={styles.bottomSheetTitle}>Connect Ledger</Text>
-            <TouchableOpacity onPress={() => ledgerSheetRef.current?.close()}>
-              <Text style={styles.bottomSheetClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
+            {editingWallet && (
+              <View style={styles.privateKeyContainer}>
+                <View style={styles.privateKeyHeader}>
+                  <Text style={styles.privateKeyLabel}>
+                    Seed Phrase (Recovery Phrase):
+                  </Text>
+                  {!editingWallet.derivationPath &&
+                    walletSeedPhraseForDisplay &&
+                    !walletSeedPhraseLoading && (
+                      <TouchableOpacity
+                        style={styles.bottomSheetCopyBtn}
+                        onPress={() => {
+                          Clipboard.setString(walletSeedPhraseForDisplay);
+                          ToastAndroid.show(
+                            "Seed phrase copied!",
+                            ToastAndroid.SHORT
+                          );
+                        }}
+                      >
+                        <Text style={styles.bottomSheetCopyIcon}>⧉</Text>
+                      </TouchableOpacity>
+                    )}
+                </View>
 
-          {ledgerScanning ? (
-            <View style={styles.ledgerStatus}>
-              <Text style={styles.ledgerStatusText}>Scanning...</Text>
-              <Text style={styles.ledgerStatusSubtext}>
-                Make sure Bluetooth is on and Solana app is open
-              </Text>
+                {editingWallet.derivationPath ? (
+                  <Text style={styles.privateKeyText}>
+                    This wallet is derived from your master seed phrase. Go to
+                    Manage Security -> Export Seed Phrase to view or back it up.
+                  </Text>
+                ) : walletSeedPhraseLoading ? (
+                  <Text style={styles.privateKeyText}>
+                    Loading seed phrase...
+                  </Text>
+                ) : walletSeedPhraseForDisplay ? (
+                  <Text style={styles.seedPhraseText} selectable={true}>
+                    {walletSeedPhraseForDisplay}
+                  </Text>
+                ) : (
+                  <Text style={styles.privateKeyText}>
+                    No stored recovery phrase was found for this wallet.
+                  </Text>
+                )}
+              </View>
+            )}
+          </BottomSheetView>
+        </BottomSheet>
+
+        {/* Ledger Connection Bottom Sheet */}
+        <BottomSheet
+          ref={ledgerSheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          enablePanDownToClose={true}
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ backgroundColor: "#000000" }}
+          handleIndicatorStyle={{ backgroundColor: "#4A90E2" }}
+        >
+          <BottomSheetView style={styles.bottomSheetContent}>
+            <View style={styles.bottomSheetHeader}>
+              <View style={{ width: 32 }} />
+              <Text style={styles.bottomSheetTitle}>Connect Ledger</Text>
+              <TouchableOpacity onPress={() => ledgerSheetRef.current?.close()}>
+                <Text style={styles.bottomSheetClose}>✕</Text>
+              </TouchableOpacity>
             </View>
-          ) : ledgerConnecting ? (
-            <View style={styles.ledgerStatus}>
-              <Text style={styles.ledgerStatusText}>
-                {ledgerDeviceName
-                  ? `Connecting to ${ledgerDeviceName}...`
-                  : "Connecting..."}
-              </Text>
-            </View>
-          ) : Array.isArray(ledgerAccounts) && ledgerAccounts.length > 0 ? (
-            <>
-              <Text style={styles.ledgerAccountsTitle}>Select an account:</Text>
-              <ScrollView style={styles.ledgerAccountsList}>
-                {ledgerAccounts.map((account) => (
-                  <TouchableOpacity
-                    key={`ledger-${account.index}`}
-                    style={styles.ledgerAccount}
-                    onPress={() => handleSelectLedgerAccount(account)}
-                  >
-                    <View style={styles.ledgerAccountLeft}>
-                      <Image
-                        source={currentNetwork.logo}
-                        style={styles.x1LogoLarge}
-                      />
-                      <View style={styles.ledgerAccountInfo}>
-                        <Text style={styles.ledgerAccountIndex}>
-                          Account {account.index + 1}
-                        </Text>
-                        <Text
-                          style={styles.ledgerAccountAddress}
-                          numberOfLines={1}
-                          ellipsizeMode="middle"
-                        >
-                          {account.address || "Unknown address"}
-                        </Text>
+
+            {ledgerScanning ? (
+              <View style={styles.ledgerStatus}>
+                <Text style={styles.ledgerStatusText}>Scanning...</Text>
+                <Text style={styles.ledgerStatusSubtext}>
+                  Make sure Bluetooth is on and Solana app is open
+                </Text>
+              </View>
+            ) : ledgerConnecting ? (
+              <View style={styles.ledgerStatus}>
+                <Text style={styles.ledgerStatusText}>
+                  {ledgerDeviceName
+                    ? `Connecting to ${ledgerDeviceName}...`
+                    : "Connecting..."}
+                </Text>
+              </View>
+            ) : Array.isArray(ledgerAccounts) && ledgerAccounts.length > 0 ? (
+              <>
+                <Text style={styles.ledgerAccountsTitle}>
+                  Select an account:
+                </Text>
+                <ScrollView style={styles.ledgerAccountsList}>
+                  {ledgerAccounts.map((account) => (
+                    <TouchableOpacity
+                      key={`ledger-${account.index}`}
+                      style={styles.ledgerAccount}
+                      onPress={() => handleSelectLedgerAccount(account)}
+                    >
+                      <View style={styles.ledgerAccountLeft}>
+                        <Image
+                          source={currentNetwork.logo}
+                          style={styles.x1LogoLarge}
+                        />
+                        <View style={styles.ledgerAccountInfo}>
+                          <Text style={styles.ledgerAccountIndex}>
+                            Account {account.index + 1}
+                          </Text>
+                          <Text
+                            style={styles.ledgerAccountAddress}
+                            numberOfLines={1}
+                            ellipsizeMode="middle"
+                          >
+                            {account.address || "Unknown address"}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </>
-          ) : (
-            <View style={styles.ledgerStatus}>
-              <Text style={styles.ledgerStatusText}>Scanning...</Text>
-            </View>
-          )}
-        </BottomSheetView>
-      </BottomSheet>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            ) : (
+              <View style={styles.ledgerStatus}>
+                <Text style={styles.ledgerStatusText}>Scanning...</Text>
+              </View>
+            )}
+          </BottomSheetView>
+        </BottomSheet>
 
-      {/* Browser BottomSheet */}
-      <BottomSheet
-        ref={browserSheetRef}
-        index={-1}
-        snapPoints={["90%"]}
-        enablePanDownToClose={true}
-        backdropComponent={(props) => (
-          <BottomSheetBackdrop
-            {...props}
-            disappearsOnIndex={-1}
-            appearsOnIndex={0}
-            opacity={0.5}
-          />
-        )}
-      >
-        <BottomSheetView style={{ flex: 1 }}>
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Browser</Text>
-            <TouchableOpacity onPress={() => browserSheetRef.current?.close()}>
-              <Text style={styles.closeButton}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* URL Input */}
-          <View style={styles.urlInputContainer}>
-            <TextInput
-              style={styles.urlInput}
-              value={browserInputUrl}
-              onChangeText={(text) => {
-                console.log("URL input changed:", text);
-                setBrowserInputUrl(text);
-              }}
-              placeholder="Enter URL"
-              placeholderTextColor="#666"
-              autoCapitalize="none"
-              autoCorrect={false}
+        {/* Browser BottomSheet */}
+        <BottomSheet
+          ref={browserSheetRef}
+          index={-1}
+          snapPoints={["90%"]}
+          enablePanDownToClose={true}
+          backdropComponent={(props) => (
+            <BottomSheetBackdrop
+              {...props}
+              disappearsOnIndex={-1}
+              appearsOnIndex={0}
+              opacity={0.5}
             />
-            <TouchableOpacity
-              style={styles.goButton}
-              onPress={() => {
-                console.log("Go button pressed! Loading URL:", browserInputUrl);
+          )}
+        >
+          <BottomSheetView style={{ flex: 1 }}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Browser</Text>
+              <TouchableOpacity
+                onPress={() => browserSheetRef.current?.close()}
+              >
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
 
-                // Sanitize and validate URL
-                let url = browserInputUrl.trim();
+            {/* URL Input */}
+            <View style={styles.urlInputContainer}>
+              <TextInput
+                style={styles.urlInput}
+                value={browserInputUrl}
+                onChangeText={(text) => {
+                  console.log("URL input changed:", text);
+                  setBrowserInputUrl(text);
+                }}
+                placeholder="Enter URL"
+                placeholderTextColor="#666"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                style={styles.goButton}
+                onPress={() => {
+                  console.log(
+                    "Go button pressed! Loading URL:",
+                    browserInputUrl
+                  );
 
-                // Add protocol if missing
-                if (
-                  url &&
-                  !url.startsWith("http://") &&
-                  !url.startsWith("https://")
-                ) {
-                  url = "https://" + url;
-                }
+                  // Sanitize and validate URL
+                  let url = browserInputUrl.trim();
 
-                // Remove spaces (common typo)
-                url = url.replace(/\s+/g, "");
+                  // Add protocol if missing
+                  if (
+                    url &&
+                    !url.startsWith("http://") &&
+                    !url.startsWith("https://")
+                  ) {
+                    url = "https://" + url;
+                  }
 
-                console.log("Sanitized URL:", url);
-                setBrowserUrl(url);
-                console.log("browserUrl state updated to:", url);
-              }}
+                  // Remove spaces (common typo)
+                  url = url.replace(/\s+/g, "");
+
+                  console.log("Sanitized URL:", url);
+                  setBrowserUrl(url);
+                  console.log("browserUrl state updated to:", url);
+                }}
+              >
+                <Text style={styles.goButtonText}>Go</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* WebView */}
+            <View
+              style={{ flex: 1, backgroundColor: "#FF0000", marginTop: 10 }}
             >
-              <Text style={styles.goButtonText}>Go</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* WebView */}
-          <View style={{ flex: 1, backgroundColor: "#FF0000", marginTop: 10 }}>
-            <WebView
-              source={{ uri: browserUrl }}
-              style={{ flex: 1, backgroundColor: "#00FF00" }}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              onMessage={handleWebViewMessage}
-              injectedJavaScriptBeforeContentLoaded={`
+              <WebView
+                source={{ uri: browserUrl }}
+                style={{ flex: 1, backgroundColor: "#00FF00" }}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                onMessage={handleWebViewMessage}
+                injectedJavaScriptBeforeContentLoaded={`
                 (function() {
                   // Create a promise-based request system
                   let requestId = 0;
@@ -5078,11 +4811,411 @@ export default function App() {
                   console.log('window.x1 API initialized');
                 })();
               `}
-            />
+              />
+            </View>
+          </BottomSheetView>
+        </BottomSheet>
+      </GestureHandlerRootView>
+
+      {/* Settings - Full Page - Outside GestureHandler */}
+      <Modal
+        visible={showSettingsModal}
+        transparent={false}
+        animationType="slide"
+        onRequestClose={navigateBackInSettings}
+      >
+        <View style={[styles.debugFullPageContainer, { paddingTop: 40 }]}>
+          {/* Header */}
+          <View style={styles.debugFullPageHeader}>
+            {settingsNavigationStack[settingsNavigationStack.length - 1] ===
+              "changeSeed" && changeSeedPhraseMode === "generate" ? (
+              <TouchableOpacity onPress={handleGenerateNewSeedPhrase}>
+                <Text style={[styles.debugFullPageClose, { fontSize: 31 }]}>
+                  ⟳
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ width: 32 }} />
+            )}
+            <Text style={styles.debugFullPageTitle}>
+              {settingsNavigationStack.length === 0
+                ? "Settings"
+                : settingsNavigationStack[
+                      settingsNavigationStack.length - 1
+                    ] === "manageSecurity"
+                  ? "Manage Security"
+                  : settingsNavigationStack[
+                        settingsNavigationStack.length - 1
+                      ] === "exportSeed"
+                    ? "Export Seed Phrase"
+                    : "Change Seed Phrase"}
+            </Text>
+            <TouchableOpacity
+              onPress={
+                settingsNavigationStack.length > 0
+                  ? navigateBackInSettings
+                  : closeAllSettings
+              }
+            >
+              <Text style={styles.debugFullPageClose}>✕</Text>
+            </TouchableOpacity>
           </View>
-        </BottomSheetView>
-      </BottomSheet>
-    </GestureHandlerRootView>
+
+          {/* Account Badge (only on main settings) */}
+          {settingsNavigationStack.length === 0 && (
+            <View
+              style={[
+                styles.settingsHeaderLeft,
+                {
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  paddingBottom: 8,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.settingsAccountBadge,
+                  { backgroundColor: selectedAccount.badgeColor },
+                ]}
+              >
+                <Text style={styles.settingsAccountBadgeText}>
+                  {selectedAccount.badge}
+                </Text>
+              </View>
+              <Text style={styles.settingsAccountName}>
+                {selectedAccount.name}
+              </Text>
+            </View>
+          )}
+
+          {/* Menu Items */}
+          <ScrollView
+            style={styles.settingsMenuList}
+            contentContainerStyle={{
+              paddingHorizontal: 16,
+              paddingTop: 8,
+              paddingBottom: 20,
+            }}
+          >
+            {settingsNavigationStack.length === 0 ? (
+              // Main Settings Menu
+              <>
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => {
+                    setShowSettingsModal(false);
+                    networkSheetRef.current?.expand();
+                  }}
+                >
+                  <Text style={styles.settingsMenuItemText}>Network</Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => {
+                    setShowSettingsModal(false);
+                    setShowBluetoothDrawer(true);
+                    fetchPairedBluetoothDevices();
+                  }}
+                >
+                  <Text style={styles.settingsMenuItemText}>
+                    Bluetooth Devices
+                  </Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => {
+                    setShowSettingsModal(false);
+                    Alert.alert(
+                      "Rename Wallet",
+                      "Rename wallet functionality would open here"
+                    );
+                  }}
+                >
+                  <Text style={styles.settingsMenuItemText}>Rename Wallet</Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => {
+                    setShowSettingsModal(false);
+                    Alert.alert(
+                      "New Account",
+                      "Create new account functionality would open here"
+                    );
+                  }}
+                >
+                  <Text style={styles.settingsMenuItemText}>New Account</Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => {
+                    setShowSettingsModal(false);
+                    Alert.alert("Preferences", "Preferences would open here");
+                  }}
+                >
+                  <Text style={styles.settingsMenuItemText}>Preferences</Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => navigateToSettingsScreen("manageSecurity")}
+                >
+                  <Text style={styles.settingsMenuItemText}>
+                    Manage Security
+                  </Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => {
+                    setShowSettingsModal(false);
+                    if (Platform.OS === "android") {
+                      Linking.sendIntent("android.settings.WIFI_SETTINGS");
+                    } else {
+                      Linking.openURL("app-settings:");
+                    }
+                  }}
+                >
+                  <Text style={styles.settingsMenuItemText}>WiFi Settings</Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => {
+                    setShowSettingsModal(false);
+                    Alert.alert(
+                      "About X1 Wallet",
+                      "About X1 Wallet info would open here"
+                    );
+                  }}
+                >
+                  <Text style={styles.settingsMenuItemText}>
+                    About X1 Wallet
+                  </Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => {
+                    setShowSettingsModal(false);
+                    setShowDebugDrawer(true);
+                  }}
+                >
+                  <Text style={styles.settingsMenuItemText}>Debug</Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+              </>
+            ) : settingsNavigationStack[settingsNavigationStack.length - 1] ===
+              "manageSecurity" ? (
+              // Manage Security Menu
+              <>
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => navigateToSettingsScreen("exportSeed")}
+                >
+                  <Text style={styles.settingsMenuItemText}>
+                    Export Seed Phrase
+                  </Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.settingsMenuItem}
+                  onPress={() => navigateToSettingsScreen("changeSeed")}
+                >
+                  <Text style={styles.settingsMenuItemText}>
+                    Change Seed Phrase
+                  </Text>
+                  <Text style={styles.settingsMenuItemArrow}>›</Text>
+                </TouchableOpacity>
+              </>
+            ) : settingsNavigationStack[settingsNavigationStack.length - 1] ===
+              "exportSeed" ? (
+              // Export Seed Phrase Screen
+              <View style={styles.bottomSheetContent}>
+                {masterSeedPhrase ? (
+                  <>
+                    <Text style={styles.seedPhraseTitle}>
+                      Your Master Seed Phrase
+                    </Text>
+                    <View style={styles.seedPhraseContainer}>
+                      <TouchableOpacity
+                        style={styles.seedPhraseCopyBtnInside}
+                        onPress={handleCopyMasterSeedPhrase}
+                      >
+                        <Text style={styles.seedPhraseCopyIconInside}>⧉</Text>
+                      </TouchableOpacity>
+                      <View style={styles.seedPhraseGrid}>
+                        {masterSeedPhrase.split(" ").map((word, index) => (
+                          <View key={index} style={styles.seedPhraseWord}>
+                            <Text style={styles.seedPhraseText}>
+                              {index + 1}. {word}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                    <Text style={styles.seedPhraseWarning}>
+                      Keep this seed phrase secure. All your HD wallets are
+                      derived from this master seed.
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.seedPhraseWarning}>
+                    No master seed phrase found. Create a new wallet to generate
+                    one.
+                  </Text>
+                )}
+              </View>
+            ) : (
+              // Change Seed Phrase Screen
+              <View style={styles.bottomSheetContent}>
+                {/* Mode Selector */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    marginBottom: 20,
+                    borderBottomWidth: 1,
+                    borderBottomColor: "#333",
+                  }}
+                >
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: 12,
+                      borderBottomWidth:
+                        changeSeedPhraseMode === "enter" ? 2 : 0,
+                      borderBottomColor: "#4A90E2",
+                    }}
+                    onPress={() => setChangeSeedPhraseMode("enter")}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          changeSeedPhraseMode === "enter" ? "#4A90E2" : "#888",
+                        textAlign: "center",
+                        fontSize: 16,
+                        fontWeight:
+                          changeSeedPhraseMode === "enter" ? "600" : "400",
+                      }}
+                    >
+                      Enter Existing
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: 12,
+                      borderBottomWidth:
+                        changeSeedPhraseMode === "generate" ? 2 : 0,
+                      borderBottomColor: "#4A90E2",
+                    }}
+                    onPress={() => {
+                      setChangeSeedPhraseMode("generate");
+                      handleGenerateNewSeedPhrase();
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          changeSeedPhraseMode === "generate"
+                            ? "#4A90E2"
+                            : "#888",
+                        textAlign: "center",
+                        fontSize: 16,
+                        fontWeight:
+                          changeSeedPhraseMode === "generate" ? "600" : "400",
+                      }}
+                    >
+                      Generate New
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {changeSeedPhraseMode === "enter" ? (
+                  <>
+                    <Text style={[styles.seedPhraseWarning, { color: "#888" }]}>
+                      Enter your new 12-word seed phrase:
+                    </Text>
+                    <TextInput
+                      style={styles.seedPhraseInput}
+                      value={newSeedPhraseInput}
+                      onChangeText={setNewSeedPhraseInput}
+                      placeholder="word1 word2 word3 ..."
+                      placeholderTextColor="#666"
+                      multiline
+                    />
+                    <TouchableOpacity
+                      style={styles.dangerButton}
+                      onPress={handleChangeSeedPhrase}
+                    >
+                      <Text style={styles.dangerButtonText}>
+                        Change Seed Phrase
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.seedPhraseContainer}>
+                      <TouchableOpacity
+                        style={styles.seedPhraseCopyBtnInside}
+                        onPress={copyGeneratedSeedPhrase}
+                      >
+                        <Text
+                          style={[
+                            styles.seedPhraseCopyIconInside,
+                            { fontSize: 20.4 },
+                          ]}
+                        >
+                          ⧉
+                        </Text>
+                      </TouchableOpacity>
+                      <View style={styles.seedPhraseGrid}>
+                        {generatedNewSeed.split(" ").map((word, index) => (
+                          <View key={index} style={styles.seedPhraseWord}>
+                            <Text style={styles.seedPhraseText}>
+                              {index + 1}. {word}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.dangerButton}
+                      onPress={() => {
+                        handleChangeSeedPhrase(generatedNewSeed);
+                      }}
+                    >
+                      <Text style={styles.dangerButtonText}>
+                        Change Seed Phrase
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                <Text style={[styles.seedPhraseWarning, { marginTop: 20 }]}>
+                  ⚠️ WARNING: Changing your master seed phrase will only affect
+                  newly created wallets. Existing wallets will remain unchanged
+                  and will continue to use their original seed phrases.
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -6024,13 +6157,17 @@ const styles = StyleSheet.create({
     borderBottomColor: "#1a1a1a",
   },
   debugFullPageTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "bold",
     color: "#FFFFFF",
+    flex: 1,
+    textAlign: "center",
   },
   debugFullPageClose: {
     fontSize: 22,
     color: "#888888",
+    width: 32,
+    textAlign: "center",
   },
   debugFullPageFooter: {
     paddingHorizontal: 20,
@@ -6262,6 +6399,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   confirmButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  dangerButton: {
+    backgroundColor: "#FF4444",
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  dangerButtonText: {
     fontSize: 16,
     fontWeight: "600",
     color: "#FFFFFF",
